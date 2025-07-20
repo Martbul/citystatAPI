@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"go-prisma-neon/db"
-	"go-prisma-neon/middleware"
-	"go-prisma-neon/services"
+	"github.com/martbul/citystatAPI/middleware"
+	"github.com/martbul/citystatAPI/prisma/db"
+	"github.com/martbul/citystatAPI/services"
 )
 
 type WebhookHandler struct {

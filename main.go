@@ -27,22 +27,29 @@ var (
 )
 
 func init() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
-	}
-
-	// Initialize Clerk
-	clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
-
-	// Initialize Prisma client
-	client = db.NewClient()
-	if err := client.Prisma.Connect(); err != nil {
-		log.Fatal("Failed to connect to database:", err)
-	}
-
-	// Initialize services
-	userService = services.NewUserService(client)
+    // Load environment variables
+    if err := godotenv.Load(); err != nil {
+        log.Println("No .env file found")
+    }
+    
+    // Debug: Check if DATABASE_URL is loaded
+    dbURL := os.Getenv("DATABASE_URL")
+    if dbURL == "" {
+        log.Fatal("DATABASE_URL environment variable is not set")
+    }
+    log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...") // Print first 50 chars for debugging
+    
+    // Initialize Clerk
+    clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
+    
+    // Initialize Prisma client
+    client = db.NewClient()
+    if err := client.Prisma.Connect(); err != nil {
+        log.Fatal("Failed to connect to database:", err)
+    }
+    
+    // Initialize services
+    userService = services.NewUserService(client)
 }
 
 func main() {
@@ -55,7 +62,7 @@ func main() {
 	tempLogger := hclog.Default()
 	// Initialize handlers
 	userHandler := appHandlers.NewUserHandler(userService)
-	postHandler := appHandlers.NewPostHandler(client, userService)
+//	postHandler := appHandlers.NewPostHandler(client, userService)
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
 	// Create router
 	r := mux.NewRouter()
@@ -64,8 +71,8 @@ func main() {
 	api := r.PathPrefix("/api").Subrouter()
 
 	// Public routes
-	api.HandleFunc("/posts", postHandler.GetPosts).Methods("GET")
-	api.HandleFunc("/posts/{id}", postHandler.GetPostByID).Methods("GET")
+	////api.HandleFunc("/posts", postHandler.GetPosts).Methods("GET")
+	//api.HandleFunc("/posts/{id}", postHandler.GetPostByID).Methods("GET")
 
 	// Protected routes
 	protected := api.PathPrefix("").Subrouter()
@@ -76,44 +83,14 @@ func main() {
 	protected.HandleFunc("/profile", userHandler.UpdateProfile).Methods("PUT")
 
 	// Post routes
-	protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
-	protected.HandleFunc("/posts/{id}", postHandler.UpdatePost).Methods("PUT")
-	protected.HandleFunc("/posts/{id}", postHandler.DeletePost).Methods("DELETE")
-	protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
+	//protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
+	//protected.HandleFunc("/posts/{id}", postHandler.UpdatePost).Methods("PUT")
+	//protected.HandleFunc("/posts/{id}", postHandler.DeletePost).Methods("DELETE")
+//	protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
 
 	// Webhook routes (separate from API)
 	r.HandleFunc("/webhook/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
 
-	// CORS configuration
-	//	corsHandler := handlers.CORS(
-	//		handlers.AllowedOrigins([]string{"*"}), // Configure this for production
-	//		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
-	//		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
-	//	)(r)
-
-	// adding gorila serveMux(allowes for registering more detailed routers)
-	//serveMux := mux.NewRouter()
-
-	// handlers for API
-	//getRouter := serveMux.Methods(http.MethodGet).Subrouter()
-	//	getRouter.HandleFunc("/products", productsHandler.ListAll).Queries("currency", "{[A-Z]{3}}")
-	//	getRouter.HandleFunc("/products", productsHandler.ListAll)
-
-	//	getRouter.HandleFunc("/products/{id:[0-9]+}", productsHandler.ListSingle).Queries("currency", "{[A-Z]{3}}")
-	//	getRouter.HandleFunc("/products/{id:[0-9]+}", productsHandler.ListSingle)
-
-	//	postRouter := serveMux.Methods(http.MethodPost).Subrouter()
-	//	postRouter.HandleFunc("/", productsHandler.Create)
-	//	postRouter.Use(productsHandler.MiddlewareValidateProduct)
-
-	//	putRouter := serveMux.Methods(http.MethodPut).Subrouter()
-	//	putRouter.HandleFunc("/{id:[0-9+]}", productsHandler.Update)
-	//	putRouter.Use(productsHandler.MiddlewareValidateProduct)
-
-	//	deleteRouter := serveMux.Methods(http.MethodDelete).Subrouter()
-	//	deleteRouter.HandleFunc("/{id:[0-9]+}", productsHandler.Delete)
-
-	// handler for documentation
 	opts := middleware.RedocOpts{SpecURL: "/swagger.yaml"}
 	swaggerHandler := middleware.Redoc(opts, nil)
 
@@ -143,7 +120,7 @@ func main() {
 	//! DON`T UNDERSTAND
 	//wrappingt he service in a go func in order to not block
 	go func() {
-		tempLogger.Info("Starting server on port 9090")
+		tempLogger.Info("Starting server on port ",port)
 
 		err := server.ListenAndServe()
 		if err != nil {

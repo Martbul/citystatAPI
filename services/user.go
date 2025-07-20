@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/clerk/clerk-sdk-go/v2"
-	"go-prisma-neon/db"
+	"github.com/martbul/citystatAPI/prisma/db"
+		"github.com/clerk/clerk-sdk-go/v2/user"
 )
 
 type UserService struct {
@@ -19,7 +19,8 @@ func NewUserService(client *db.PrismaClient) *UserService {
 // SyncUserFromClerk creates or updates user from Clerk data
 func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
 	// Get user from Clerk
-	clerkUser, err := clerk.Users().Read(ctx, clerkUserID)
+	//clerkUser, err := clerk.Users().Read(ctx, clerkUserID)
+		clerkUser, err := user.Get(ctx, clerkUserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user from Clerk: %w", err)
 	}
@@ -31,8 +32,8 @@ func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string)
 	}
 
 	var imageUrl *string
-	if clerkUser.ImageURL != "" {
-		imageUrl = &clerkUser.ImageURL
+	if *clerkUser.ImageURL != "" {
+		imageUrl = clerkUser.ImageURL
 	}
 
 	// Try to find existing user
@@ -52,7 +53,7 @@ func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string)
 			db.User.Email.Set(email),
 			db.User.FirstName.SetIfPresent(clerkUser.FirstName),
 			db.User.LastName.SetIfPresent(clerkUser.LastName),
-			db.User.ImageUrl.SetIfPresent(imageUrl),
+			db.User.ImageURL.SetIfPresent(imageUrl),
 		).Exec(ctx)
 
 		if err != nil {
@@ -68,7 +69,7 @@ func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string)
 		db.User.Email.Set(email),
 		db.User.FirstName.SetIfPresent(clerkUser.FirstName),
 		db.User.LastName.SetIfPresent(clerkUser.LastName),
-		db.User.ImageUrl.SetIfPresent(imageUrl),
+		db.User.ImageURL.SetIfPresent(imageUrl),
 	).Exec(ctx)
 
 	if err != nil {
