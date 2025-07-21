@@ -1,4 +1,5 @@
-module github.com/martbul/citystatAPI
+// module github.com/martbul/citystatAPI
+module citystatAPI
 
 go 1.24.4
 

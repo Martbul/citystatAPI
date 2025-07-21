@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/martbul/citystatAPI/middleware"
-	"github.com/martbul/citystatAPI/services"
+	"citystatAPI/middleware"
+	"citystatAPI/services"
 )
 
 type UserHandler struct {

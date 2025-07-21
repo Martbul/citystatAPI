@@ -14,9 +14,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/martbul/citystatAPI/middleware"
-	"github.com/martbul/citystatAPI/prisma/db"
-	"github.com/martbul/citystatAPI/services"
+	"citystatAPI/middleware"
+	"citystatAPI/prisma/db"
+	"citystatAPI/services"
 )
 
 type WebhookHandler struct {

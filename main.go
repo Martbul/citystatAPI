@@ -14,10 +14,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
 	"github.com/joho/godotenv"
-	appHandlers "github.com/martbul/citystatAPI/handlers"
-	appMiddleware "github.com/martbul/citystatAPI/middleware"
-	"github.com/martbul/citystatAPI/prisma/db"
-	"github.com/martbul/citystatAPI/services"
+	appHandlers "citystatAPI/handlers"
+	appMiddleware "citystatAPI/middleware"
+	"citystatAPI/prisma/db"
+	"citystatAPI/services"
 )
 
 // var bindAddress = env.String("BIND_ADDRESS", false, ":9090", "Bind address for the server")

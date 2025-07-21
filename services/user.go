@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/clerk/clerk-sdk-go/v2/user"
-	"github.com/martbul/citystatAPI/prisma/db"
+	"citystatAPI/prisma/db"
 )
 
 type UserService struct {
