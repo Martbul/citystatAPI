@@ -84,7 +84,7 @@ func main() {
 //	protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
 
 	// Webhook routes (separate from API)
-	r.HandleFunc("/webhook/clerk", webhookHandler.HandleClerkWebhook).Methods("POST")
+	r.HandleFunc("/webhooks", webhookHandler.HandleClerkWebhook).Methods("POST")
 
 	opts := middleware.RedocOpts{SpecURL: "/swagger.yaml"}
 	swaggerHandler := middleware.Redoc(opts, nil)
