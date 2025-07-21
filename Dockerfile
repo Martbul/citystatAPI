@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Test the exact build command
-RUN go run github.com/steebchen/prisma-client-go generate && \
+RUN go run github.com/steebchen/prisma-client-go generate && ls -l prisma/db && \
     go build -tags netgo -ldflags '-s -w' -o app
 
 # Test that the binary was created and works
