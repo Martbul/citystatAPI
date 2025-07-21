@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/clerk/clerk-sdk-go/v2/user"
 	"github.com/martbul/citystatAPI/prisma/db"
-		"github.com/clerk/clerk-sdk-go/v2/user"
 )
 
 type UserService struct {

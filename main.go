@@ -27,28 +27,23 @@ var (
 )
 
 func init() {
-    // Load environment variables
     if err := godotenv.Load(); err != nil {
         log.Println("No .env file found")
     }
     
-    // Debug: Check if DATABASE_URL is loaded
     dbURL := os.Getenv("DATABASE_URL")
     if dbURL == "" {
         log.Fatal("DATABASE_URL environment variable is not set")
     }
     log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...") // Print first 50 chars for debugging
     
-    // Initialize Clerk
     clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
     
-    // Initialize Prisma client
     client = db.NewClient()
     if err := client.Prisma.Connect(); err != nil {
         log.Fatal("Failed to connect to database:", err)
     }
     
-    // Initialize services
     userService = services.NewUserService(client)
 }
 
@@ -60,17 +55,17 @@ func main() {
 	}()
 
 	tempLogger := hclog.Default()
-	// Initialize handlers
+
 	userHandler := appHandlers.NewUserHandler(userService)
 //	postHandler := appHandlers.NewPostHandler(client, userService)
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
-	// Create router
+
 	r := mux.NewRouter()
 
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
 
-	// Public routes
+
 	////api.HandleFunc("/posts", postHandler.GetPosts).Methods("GET")
 	//api.HandleFunc("/posts/{id}", postHandler.GetPostByID).Methods("GET")
 
@@ -78,9 +73,9 @@ func main() {
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(appMiddleware.ClerkMiddleware)
 
-	// User routes
-	protected.HandleFunc("/profile", userHandler.GetProfile).Methods("GET")
-	protected.HandleFunc("/profile", userHandler.UpdateProfile).Methods("PUT")
+
+	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
+	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 
 	// Post routes
 	//protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
@@ -106,7 +101,7 @@ func main() {
 	//ch := handlers.CORS(handlers.AllowedOrigins([]string{"http://localhost:3000"}))
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = ":8080"
+		port = ":3333"
 	}
 	server := http.Server{
 		Addr:         port,
@@ -120,7 +115,8 @@ func main() {
 	//! DON`T UNDERSTAND
 	//wrappingt he service in a go func in order to not block
 	go func() {
-		tempLogger.Info("Starting server on port ",port)
+		tempLogger.Info("Starting server on port ")
+		tempLogger.Info(port)
 
 		err := server.ListenAndServe()
 		if err != nil {

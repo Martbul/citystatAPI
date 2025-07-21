@@ -4,3 +4,10 @@ node_modules
 
 /generated/prisma
 .env
+
+
+/vendor/
+
+.env
+.env.local
+.env.*
