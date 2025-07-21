@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: citystat-api
-    env: go
-    buildCommand: make build BINARY_NAME=app
-    startCommand: ./app
