@@ -74,7 +74,7 @@ func main() {
 	protected.Use(appMiddleware.ClerkMiddleware)
 
 
-	protected.HandleFunc("/api", userHandler.GetProfile).Methods("GET")
+	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
 
 	// Post routes
