@@ -13,10 +13,7 @@ generate:
 # Online build
 .PHONY: build
 build: generate
-	@echo ">> Building with GOPROXY=$(GOPROXY_URL)..."
-	GOPROXY=$(GOPROXY_URL) go mod tidy
-	GOPROXY=$(GOPROXY_URL) go build -o $(BINARY_NAME) .
-
+	go run github.com/steebchen/prisma-client-go generate && go build -tags netgo -ldflags '-s -w' -o app
 # Run the app
 .PHONY: run
 run: build
