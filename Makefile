@@ -13,7 +13,7 @@ generate:
 # Online build
 .PHONY: build
 build: generate
-	go run github.com/steebchen/prisma-client-go generate && go build -tags netgo -ldflags '-s -w' -o app
+	go run github.com/steebchen/prisma-client-go generate && go build -tags netgo -ldflags '-s -w' -o $(BINARY_NAME)
 # Run the app
 .PHONY: run
 run: build
