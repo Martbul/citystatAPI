@@ -8,16 +8,16 @@ import (
 	"os/signal"
 	"time"
 
+	appHandlers "citystatAPI/handlers"
+	appMiddleware "citystatAPI/middleware"
+	"citystatAPI/prisma/db"
+	"citystatAPI/services"
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
 	"github.com/joho/godotenv"
-	appHandlers "citystatAPI/handlers"
-	appMiddleware "citystatAPI/middleware"
-	"citystatAPI/prisma/db"
-	"citystatAPI/services"
 )
 
 // var bindAddress = env.String("BIND_ADDRESS", false, ":9090", "Bind address for the server")
@@ -27,24 +27,24 @@ var (
 )
 
 func init() {
-    if err := godotenv.Load(); err != nil {
-        log.Println("No .env file found")
-    }
-    
-    dbURL := os.Getenv("DATABASE_URL")
-    if dbURL == "" {
-        log.Fatal("DATABASE_URL environment variable is not set")
-    }
-    log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...") // Print first 50 chars for debugging
-    
-    clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
-    
-    client = db.NewClient()
-    if err := client.Prisma.Connect(); err != nil {
-        log.Fatal("Failed to connect to database:", err)
-    }
-    
-    userService = services.NewUserService(client)
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL environment variable is not set")
+	}
+	log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...") // Print first 50 chars for debugging
+
+	clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
+
+	client = db.NewClient()
+	if err := client.Prisma.Connect(); err != nil {
+		log.Fatal("Failed to connect to database:", err)
+	}
+
+	userService = services.NewUserService(client)
 }
 
 func main() {
@@ -57,14 +57,13 @@ func main() {
 	tempLogger := hclog.Default()
 
 	userHandler := appHandlers.NewUserHandler(userService)
-//	postHandler := appHandlers.NewPostHandler(client, userService)
+	//	postHandler := appHandlers.NewPostHandler(client, userService)
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
 
 	r := mux.NewRouter()
 
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
-
 
 	////api.HandleFunc("/posts", postHandler.GetPosts).Methods("GET")
 	//api.HandleFunc("/posts/{id}", postHandler.GetPostByID).Methods("GET")
@@ -89,7 +88,7 @@ func main() {
 	//protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
 	//protected.HandleFunc("/posts/{id}", postHandler.UpdatePost).Methods("PUT")
 	//protected.HandleFunc("/posts/{id}", postHandler.DeletePost).Methods("DELETE")
-//	protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
+	//	protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
 
 	// Webhook routes (separate from API)
 	r.HandleFunc("/webhooks", webhookHandler.HandleClerkWebhook).Methods("POST")
@@ -109,8 +108,10 @@ func main() {
 	//ch := handlers.CORS(handlers.AllowedOrigins([]string{"http://localhost:3000"}))
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = ":3333"
+		port = "3333"
 	}
+	port = ":" + port
+
 	server := http.Server{
 		Addr:         port,
 		Handler:      corsHandler(r),                                            // set the default handler
