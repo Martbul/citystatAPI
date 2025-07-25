@@ -17,7 +17,6 @@ type UserUpdateRequest struct {
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
 	UserName *string `json:"userName,omitempty"`
-	Email     *string `json:"email,omitempty"`
 	ImageURL  *string `json:"imageUrl,omitempty"`
 }
 
@@ -27,6 +26,8 @@ func NewUserService(client *db.PrismaClient) *UserService {
 
 // UpdateUser updates user data in the database
 func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, updates UserUpdateRequest) (*db.UserModel, error) {
+		fmt.Println("updating user")
+
 	fmt.Println(updates)
 	// Ensure user exists first
 	existingUser, err := s.client.User.FindUnique(
@@ -49,9 +50,6 @@ func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, update
 	// Build update operations based on provided fields
 	updateOps := []db.UserSetParam{}
 
-	if updates.Email != nil {
-		updateOps = append(updateOps, db.User.Email.Set(*updates.Email))
-	}
 	if updates.FirstName != nil {
 		updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
 	}

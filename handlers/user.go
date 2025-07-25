@@ -55,13 +55,11 @@
 // 	middleware.JSONResponse(w, user, http.StatusOK)
 // }
 
-
-
-
 package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"citystatAPI/middleware"
@@ -107,7 +105,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	
+	fmt.Println("req body parsed")
 
 	// Update user with the provided data
 	user, err := h.userService.UpdateUser(r.Context(), userID, updateReq)
@@ -115,6 +113,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("user updated successfuly")
 
 	middleware.JSONResponse(w, user, http.StatusOK)
 }
