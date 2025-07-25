@@ -22,13 +22,29 @@ model User {
   updatedAt         DateTime  @updatedAt
   completedTutorial Boolean   @default(false)
   Settings          Settings?
-  friendIds         String[]  @default([])
+ 
+  friends   Friend[] @relation("FriendsFromUser")
+  friendOf  Friend[] @relation("FriendsToUser")
   note              String?   @default("")
   status            Status    @default(ACTIVE)
 
   @@map("users")
 }
 
+
+model Friend {
+  id       String @id @default(cuid())
+  userId   String @map("user_id")
+  friendId String @map("friend_id")
+  
+  user   User @relation("FriendsFromUser", fields: [userId], references: [id])
+  friend User @relation("FriendsToUser", fields: [friendId], references: [id])
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, friendId])
+  @@map("user_friends")
+}
 model CityStat {
   id                 String   @id @default(cuid())
   name               String

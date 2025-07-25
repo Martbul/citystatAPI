@@ -85,13 +85,15 @@ func (h *WebhookHandler) verifyWebhookSignature(payload []byte, headers http.Hea
 }
 
 func (h *WebhookHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Request) {
+		log.Println("🔥 Webhook received!")
 	// Read the payload
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
+				log.Printf("❌ Failed to read payload: %v", err)
 		middleware.ErrorResponse(w, "Failed to read payload", http.StatusBadRequest)
 		return
 	}
-
+	log.Printf("📦 Payload received: %s", string(payload))
 	// Verify webhook signature (uncomment in production)
 	// if !h.verifyWebhookSignature(payload, r.Header) {
 	// 	middleware.ErrorResponse(w, "Invalid signature", http.StatusUnauthorized)
@@ -129,6 +131,7 @@ func (h *WebhookHandler) HandleClerkWebhook(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+
 func (h *WebhookHandler) handleUserCreated(w http.ResponseWriter, data map[string]interface{}) {
 	userData := h.parseUserData(data)
 	if userData == nil {
@@ -136,24 +139,26 @@ func (h *WebhookHandler) handleUserCreated(w http.ResponseWriter, data map[strin
 		return
 	}
 
-	// Create user in database
-	_, err := h.client.User.CreateOne(
+	log.Printf("🆕 Creating user: %+v", userData)
+
+	// Create user in database - Fix the field names
+	user, err := h.client.User.CreateOne(
 		db.User.ID.Set(userData.ID),
 		db.User.Email.Set(userData.GetPrimaryEmail()),
 		db.User.FirstName.SetIfPresent(userData.FirstName),
 		db.User.LastName.SetIfPresent(userData.LastName),
-		db.User.ImageURL.SetIfPresent(&userData.ImageURL),
+		db.User.ImageURL.SetIfPresent(&userData.ImageURL), // Make sure this matches your schema field name
 		db.User.CreatedAt.Set(time.Unix(userData.CreatedAt/1000, 0)),
 		db.User.UpdatedAt.Set(time.Unix(userData.UpdatedAt/1000, 0)),
 	).Exec(context.Background())
 
 	if err != nil {
-		log.Printf("Failed to create user %s: %v", userData.ID, err)
+		log.Printf("❌ Failed to create user %s: %v", userData.ID, err)
 		middleware.ErrorResponse(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Successfully created user %s", userData.ID)
+	log.Printf("✅ Successfully created user: %+v", user)
 	middleware.JSONResponse(w, map[string]string{"message": "User created"}, http.StatusOK)
 }
 
@@ -208,16 +213,21 @@ func (h *WebhookHandler) handleUserDeleted(w http.ResponseWriter, data map[strin
 }
 
 func (h *WebhookHandler) parseUserData(data map[string]interface{}) *ClerkWebhookData {
+	log.Printf("🔍 Parsing user data: %+v", data)
+	
 	jsonData, err := json.Marshal(data)
 	if err != nil {
+		log.Printf("❌ Failed to marshal data: %v", err)
 		return nil
 	}
 
 	var userData ClerkWebhookData
 	if err := json.Unmarshal(jsonData, &userData); err != nil {
+		log.Printf("❌ Failed to unmarshal user data: %v", err)
 		return nil
 	}
 
+	log.Printf("✅ Parsed user data: %+v", userData)
 	return &userData
 }
 
