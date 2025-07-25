@@ -9,25 +9,25 @@ datasource db {
 }
 
 model User {
-  id          String    @id // Clerk user ID
-  email       String    @unique
-  firstName   String?
-  lastName    String?
-  imageUrl    String?
-  phoneNumber String?
-  cityStats   CityStat?
-  role        Role   @default(USER)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  completedTutorial Boolean @default(false)
-  Settings    Settings?
-  friendIds   String[] @default([])
-  note       String? @default("")
-  status      Status @default(ACTIVE)
+  id                String    @id // Clerk user ID
+  email             String    @unique
+  firstName         String?
+  lastName          String?
+  username          String?
+  imageUrl          String?
+  phoneNumber       String?
+  cityStats         CityStat?
+  role              Role      @default(USER)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedTutorial Boolean   @default(false)
+  Settings          Settings?
+  friendIds         String[]  @default([])
+  note              String?   @default("")
+  status            Status    @default(ACTIVE)
 
   @@map("users")
 }
-
 
 model CityStat {
   id                 String   @id @default(cuid())
@@ -44,7 +44,7 @@ model CityStat {
   totalKilometers    Float    @default(0)
   cityCoveragePct    Float    @default(0)
   daysActive         Int      @default(0)
-  longestStreakDays  Int      @default(0) 
+  longestStreakDays  Int      @default(0)
 
   streetWalks StreetWalk[]
   settingsId  String?
@@ -59,20 +59,18 @@ model StreetWalk {
 
   streetName String
   geoJson    Json // Store geolocation path (e.g., Mapbox LineString)
-  distanceKm Float    @default(0)
+  distanceKm Float  @default(0)
 
   @@map("street_walks")
 }
 
 model Settings {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-
-  theme     Theme   @default(Light) 
-  language  Language   @default(En) 
-
+  theme    Theme    @default(Light)
+  language Language @default(En)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,7 +104,6 @@ enum Status {
   IDLE
   INVISIBLE
 }
-
 
 enum Role {
   USER
