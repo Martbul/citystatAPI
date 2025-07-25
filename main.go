@@ -73,9 +73,17 @@ func main() {
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(appMiddleware.ClerkMiddleware)
 
-
+	// User routes
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
+	// Optional: separate endpoint for syncing from Clerk
+	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")
+
+	// Post routes (commented out as in original)
+	//protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
+	//protected.HandleFunc("/posts/{id}", postHandler.UpdatePost).Methods("PUT")
+	//protected.HandleFunc("/posts/{id}", postHandler.DeletePost).Methods("DELETE")
+	//protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
 
 	// Post routes
 	//protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
