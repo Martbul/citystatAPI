@@ -13,7 +13,7 @@ model User {
   email             String    @unique
   firstName         String?
   lastName          String?
-  username          String?
+  userName          String?
   imageUrl          String?
   phoneNumber       String?
   cityStats         CityStat?

@@ -107,6 +107,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	
 
 	// Update user with the provided data
 	user, err := h.userService.UpdateUser(r.Context(), userID, updateReq)

@@ -16,6 +16,7 @@ type UserService struct {
 type UserUpdateRequest struct {
 	FirstName *string `json:"firstName,omitempty"`
 	LastName  *string `json:"lastName,omitempty"`
+	UserName *string `json:"userName,omitempty"`
 	Email     *string `json:"email,omitempty"`
 	ImageURL  *string `json:"imageUrl,omitempty"`
 }
@@ -26,6 +27,7 @@ func NewUserService(client *db.PrismaClient) *UserService {
 
 // UpdateUser updates user data in the database
 func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, updates UserUpdateRequest) (*db.UserModel, error) {
+	fmt.Println(updates)
 	// Ensure user exists first
 	existingUser, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
@@ -55,6 +57,9 @@ func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, update
 	}
 	if updates.LastName != nil {
 		updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
+	}
+	if updates.UserName != nil {
+		updateOps = append(updateOps, db.User.Username.Set(*updates.UserName))
 	}
 	if updates.ImageURL != nil {
 		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
@@ -129,6 +134,7 @@ func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string)
 		db.User.Email.Set(email),
 		db.User.FirstName.SetIfPresent(clerkUser.FirstName),
 		db.User.LastName.SetIfPresent(clerkUser.LastName),
+		db.User.Username.SetIfPresent(clerkUser.Username),
 		db.User.ImageURL.SetIfPresent(imageUrl),
 	).Exec(ctx)
 
