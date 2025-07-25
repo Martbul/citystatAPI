@@ -20,10 +20,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// var bindAddress = env.String("BIND_ADDRESS", false, ":9090", "Bind address for the server")
 var (
-	client      *db.PrismaClient
-	userService *services.UserService
+	client        *db.PrismaClient
+	userService   *services.UserService
+	friendService *services.FriendService
 )
 
 func init() {
@@ -35,7 +35,7 @@ func init() {
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL environment variable is not set")
 	}
-	log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...") // Print first 50 chars for debugging
+	log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...")
 
 	clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
 
@@ -45,6 +45,7 @@ func init() {
 	}
 
 	userService = services.NewUserService(client)
+	friendService = services.NewFriendService(client)
 }
 
 func main() {
@@ -57,16 +58,13 @@ func main() {
 	tempLogger := hclog.Default()
 
 	userHandler := appHandlers.NewUserHandler(userService)
-	//	postHandler := appHandlers.NewPostHandler(client, userService)
+	friendHandler := appHandlers.NewFriendHandler(friendService)
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
 
 	r := mux.NewRouter()
 
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
-
-	////api.HandleFunc("/posts", postHandler.GetPosts).Methods("GET")
-	//api.HandleFunc("/posts/{id}", postHandler.GetPostByID).Methods("GET")
 
 	// Protected routes
 	protected := api.PathPrefix("").Subrouter()
@@ -75,22 +73,15 @@ func main() {
 	// User routes
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
-	// Optional: separate endpoint for syncing from Clerk
+
+	// Friend routes
+	protected.HandleFunc("/users/search", friendHandler.SearchUsers).Methods("GET")
+	protected.HandleFunc("/friends/add", friendHandler.AddFriend).Methods("POST")
+	protected.HandleFunc("/friends/list", friendHandler.GetFriends).Methods("GET")
+	protected.HandleFunc("/friends/{friendId}", friendHandler.RemoveFriend).Methods("DELETE")
+
+	//Clerk routes
 	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")
-
-	// Post routes (commented out as in original)
-	//protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
-	//protected.HandleFunc("/posts/{id}", postHandler.UpdatePost).Methods("PUT")
-	//protected.HandleFunc("/posts/{id}", postHandler.DeletePost).Methods("DELETE")
-	//protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
-
-	// Post routes
-	//protected.HandleFunc("/posts", postHandler.CreatePost).Methods("POST")
-	//protected.HandleFunc("/posts/{id}", postHandler.UpdatePost).Methods("PUT")
-	//protected.HandleFunc("/posts/{id}", postHandler.DeletePost).Methods("DELETE")
-	//	protected.HandleFunc("/my-posts", postHandler.GetMyPosts).Methods("GET")
-
-	// Webhook routes (separate from API)
 	r.HandleFunc("/webhooks", webhookHandler.HandleClerkWebhook).Methods("POST")
 
 	opts := middleware.RedocOpts{SpecURL: "/swagger.yaml"}
@@ -104,8 +95,7 @@ func main() {
 		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
 		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
 	)
-	//CORS
-	//ch := handlers.CORS(handlers.AllowedOrigins([]string{"http://localhost:3000"}))
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3333"
@@ -121,8 +111,6 @@ func main() {
 		IdleTimeout:  120 * time.Second,                                         // max time for connections using TCP Keep-Alive
 	}
 
-	//! DON`T UNDERSTAND
-	//wrappingt he service in a go func in order to not block
 	go func() {
 		tempLogger.Info("Starting server on port ")
 		tempLogger.Info(port)
@@ -135,15 +123,13 @@ func main() {
 	}()
 
 	sigChan := make(chan os.Signal)
-	// broadcasting a message on the sigChan whenever an opperating system kill's command or interupt(now when you do ctrl + c and kill the running server it will gracefuly shutdown)
 	signal.Notify(sigChan, os.Interrupt)
 	signal.Notify(sigChan, os.Kill)
 
 	sig := <-sigChan
 	log.Println("Got signal:", sig)
 
-	timeoutContext, _ := context.WithTimeout(context.Background(), 30*time.Second) //allowing 30 sec for gracefuls shutdow, after them the server will forcefully shutdown
+	timeoutContext, _ := context.WithTimeout(context.Background(), 30*time.Second)
 
-	// this is graceful shutdown,the server will no longer accept new requests and will wait until it has completed all the old requests, before shuting down
 	server.Shutdown(timeoutContext)
 }
