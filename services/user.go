@@ -58,6 +58,10 @@ func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, update
 	if updates.ImageURL != nil {
 		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
 	}
+		if updates.CompletedTutorial != nil {
+		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
+	}
+
 
 	// If no updates provided, return existing user
 	if len(updateOps) == 0 {
