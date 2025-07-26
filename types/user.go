@@ -6,6 +6,7 @@ type UserUpdateRequest struct {
 	LastName  *string `json:"lastName,omitempty"`
 	UserName *string `json:"userName,omitempty"`
 	ImageURL  *string `json:"imageUrl,omitempty"`
+	CompletedTutorial *bool   `json:"completedTutorial,omitempty"`
 }
 
 
