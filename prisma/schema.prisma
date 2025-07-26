@@ -30,15 +30,14 @@ model User {
 
   @@map("users")
 }
-
 model Friend {
   id        String  @id @default(cuid())
   userId    String  @map("user_id")
   friendId  String  @map("friend_id")
   firstName String?
   lastName  String?
-  userName  String
-  imageUrl  String?
+  userName  String  // Changed from userName to userName (consistent camelCase)
+  imageUrl  String? // Changed from imageUrl to imageUrl (consistent camelCase)
 
   user   User @relation("FriendsFromUser", fields: [userId], references: [id])
   friend User @relation("FriendsToUser", fields: [friendId], references: [id])

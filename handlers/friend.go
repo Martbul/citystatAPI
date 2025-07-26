@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -21,7 +22,6 @@ func NewFriendHandler(friendService *services.FriendService) *FriendHandler {
 	return &FriendHandler{friendService: friendService}
 }
 
-// SearchUsers handles GET /api/users/search?username=<query>
 func (h *FriendHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
@@ -30,12 +30,12 @@ func (h *FriendHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	username := r.URL.Query().Get("username")
+	fmt.Println("Searching for users with username:", username)
 	if username == "" {
 		middleware.ErrorResponse(w, "Username parameter is required", http.StatusBadRequest)
 		return
 	}
 
-	// Trim and validate input
 	username = strings.TrimSpace(username)
 	if len(username) < 1 {
 		middleware.ErrorResponse(w, "Username must be at least 1 character", http.StatusBadRequest)
