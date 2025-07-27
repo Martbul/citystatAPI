@@ -33,3 +33,18 @@ type FriendResult struct {
 type FriendsListResponse struct {
 	Friends []FriendResult `json:"friends"`
 }
+
+type GetFriendProfileRequest struct {
+	FriendId string `json:"friendId"`
+}
+
+//TODO: add all cioty stats of the friend into the response
+type GetFriendProfileResponse struct {
+	ID        string  `json:"id"`
+	UserName  string  `json:"userName"`
+	FirstName *string `json:"firstName"`
+	LastName  *string `json:"lastName"`
+	ImageURL  *string `json:"imageUrl"`
+	CreatedAt string  `json:"createdAt"`
+	UpdatedAt string  `json:"updatedAt"`
+}

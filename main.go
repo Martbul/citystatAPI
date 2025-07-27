@@ -59,9 +59,15 @@ func main() {
 
 	userHandler := appHandlers.NewUserHandler(userService)
 	friendHandler := appHandlers.NewFriendHandler(friendService)
+	inviteHandler := appHandlers.NewInviteHandler(userService, friendService)
+
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
 
 	r := mux.NewRouter()
+
+	
+	// Public invite routes (no auth required for initial processing)
+	r.HandleFunc("/invite", inviteHandler.ProcessInvite).Methods("GET")
 
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
@@ -76,9 +82,18 @@ func main() {
 
 	// Friend routes
 	protected.HandleFunc("/users/search", friendHandler.SearchUsers).Methods("GET")
+		protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
 	protected.HandleFunc("/friends/add", friendHandler.AddFriend).Methods("POST")
 	protected.HandleFunc("/friends/list", friendHandler.GetFriends).Methods("GET")
 	protected.HandleFunc("/friends/{friendId}", friendHandler.RemoveFriend).Methods("DELETE")
+
+	// Invite routes
+	protected.HandleFunc("/invite/accept", inviteHandler.AcceptInvite).Methods("POST")
+	protected.HandleFunc("/invite/link", inviteHandler.GetInviteLink).Methods("GET")
+
+	// Settings routes
+	protected.HandleFunc("/settings/account", friendHandler.SearchUsers).Methods("GET")
+
 
 	//Clerk routes
 	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")

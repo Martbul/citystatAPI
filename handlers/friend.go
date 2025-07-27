@@ -17,7 +17,6 @@ type FriendHandler struct {
 	friendService *services.FriendService
 }
 
-
 func NewFriendHandler(friendService *services.FriendService) *FriendHandler {
 	return &FriendHandler{friendService: friendService}
 }
@@ -101,6 +100,7 @@ func (h *FriendHandler) AddFriend(w http.ResponseWriter, r *http.Request) {
 
 // GetFriends handles GET /api/friends/list
 func (h *FriendHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("getting friends")
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
 		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
@@ -115,6 +115,50 @@ func (h *FriendHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 
 	response := types.FriendsListResponse{Friends: friends}
 	middleware.JSONResponse(w, response, http.StatusOK)
+}
+
+func (h *FriendHandler) GetFriendProfile(w http.ResponseWriter, r *http.Request) {
+	// fmt.Println("getting friend profile")
+	// userID, ok := middleware.GetUserID(r)
+	// if !ok {
+	// 	middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+	// 	return
+	// }
+
+	
+	// var req types.GetFriendProfileRequest
+	// if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// 	middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
+	// 	return
+	// }
+
+	// if req.FriendId == "" {
+	// 	middleware.ErrorResponse(w, "Friend ID is required", http.StatusBadRequest)
+	// 	return
+	// }
+
+	
+	// friendProfile, err := h.friendService.GetFriendProfile(r.Context(), userID, req.FriendId)
+	// if err != nil {
+	// 	// Handle specific error cases
+	// 	if strings.Contains(err.Error(), "not found") {
+	// 		middleware.ErrorResponse(w, "User not found", http.StatusNotFound)
+	// 		return
+	// 	}
+	// 	if strings.Contains(err.Error(), "already friends") {
+	// 		middleware.ErrorResponse(w, "Already friends with this user", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// 	middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// response := types.GetFriendProfileRequest{
+	// 	Message: "Friend added successfully",
+	// 	Friend:  *friend,
+	// }
+	// middleware.JSONResponse(w, response, http.StatusOK)
+
 }
 
 // RemoveFriend handles DELETE /api/friends/{friendId}
