@@ -79,7 +79,7 @@ func main() {
 	// User routes
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
-
+protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
 	// Friend routes
 	protected.HandleFunc("/users/search", friendHandler.SearchUsers).Methods("GET")
 		protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
