@@ -45,7 +45,7 @@ func (h *InviteHandler) ProcessInvite(w http.ResponseWriter, r *http.Request) {
 		invitingFirstName,_ := invitingUser.FirstName()
 
 	invitingLastName,_ := invitingUser.LastName()
-	invitingInageURL,_ := invitingUser.ImageURL()
+	invitingInageURL := invitingUser.ImageURL
 
 	response := types.InviteInfoResponse{
 		InvitedBy: types.InviteUserInfo{

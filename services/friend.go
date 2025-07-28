@@ -48,7 +48,7 @@ func (s *FriendService) SearchUsers(ctx context.Context, currentUserID, username
 		firstName, _ := user.FirstName()
 		lastName, _ := user.LastName()
 		userName, _ := user.UserName()
-		imageURL, _ := user.ImageURL()
+		imageURL:= user.ImageURL
 		results[i] = types.UserSearchResult{
 			ID:        user.ID,
 			UserName:  &userName,
@@ -93,8 +93,7 @@ func (s *FriendService) AddFriend(ctx context.Context, userID, friendID string) 
 	friendUserName, _ := friendUser.UserName()
 	friendFirstName, _ := friendUser.FirstName()
 	friendLastName, _ := friendUser.LastName()
-	friendImageURL, _ := friendUser.ImageURL()
-
+	friendImageURL := friendUser.ImageURL
 	// Create friendship record with required parameters first, then optional ones
 	var optionalParams []db.FriendSetParam
 	
@@ -127,7 +126,7 @@ func (s *FriendService) AddFriend(ctx context.Context, userID, friendID string) 
 		currentUserName, _ := currentUser.UserName()
 		currentFirstName, _ := currentUser.FirstName()
 		currentLastName, _ := currentUser.LastName()
-		currentImageURL, _ := currentUser.ImageURL()
+		currentImageURL := currentUser.ImageURL
 
 		// Create reciprocal friendship
 		var reciprocalOptionalParams []db.FriendSetParam

@@ -14,7 +14,7 @@ model User {
   firstName         String?
   lastName          String?
   userName          String?
-  imageUrl          String?
+  imageUrl          String  @default("https://48htuluf59.ufs.sh/f/1NvBfFppWcZeWF2WCCi3zDay6IgjQLVNYHEhKiCJ8OeGwTon")
   phoneNumber       String?
   cityStats         CityStat?
   role              Role      @default(USER)
@@ -27,6 +27,7 @@ model User {
   friendOf Friend[] @relation("FriendsToUser")
   note     String?  @default("")
   status   Status   @default(ACTIVE)
+  visitedStreets      VisitedStreet[] 
 
   @@map("users")
 }
@@ -36,8 +37,8 @@ model Friend {
   friendId  String  @map("friend_id")
   firstName String?
   lastName  String?
-  userName  String  // Changed from userName to userName (consistent camelCase)
-  imageUrl  String? // Changed from imageUrl to imageUrl (consistent camelCase)
+  userName  String  
+  imageUrl  String? 
 
   user   User @relation("FriendsFromUser", fields: [userId], references: [id])
   friend User @relation("FriendsToUser", fields: [friendId], references: [id])
@@ -48,25 +49,25 @@ model Friend {
   @@map("user_friends")
 }
 
+
 model CityStat {
-  id                 String   @id @default(cuid())
+  id                 String      @id @default(cuid())
   name               String
   state              String
   country            String
   population         Int?
   area               Float?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  userId             String   @unique
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  totalStreetsWalked Int      @default(0)
-  totalKilometers    Float    @default(0)
-  cityCoveragePct    Float    @default(0)
-  daysActive         Int      @default(0)
-  longestStreakDays  Int      @default(0)
-
-  streetWalks StreetWalk[]
-  settingsId  String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  userId             String      @unique
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalStreetsWalked Int         @default(0)
+  totalKilometers    Float       @default(0)
+  cityCoveragePct    Float       @default(0)
+  daysActive         Int         @default(0)
+  longestStreakDays  Int         @default(0)
+  streetWalks        StreetWalk[]
+  settingsId         String?
 
   @@map("city_stats")
 }
@@ -83,6 +84,31 @@ model StreetWalk {
   @@map("street_walks")
 }
 
+
+model VisitedStreet {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  sessionId        String   @map("session_id")
+  streetId         String   @map("street_id")
+  streetName       String   @map("street_name")
+  entryTimestamp   BigInt   @map("entry_timestamp")
+  exitTimestamp    BigInt?  @map("exit_timestamp")
+  durationSeconds  Int?     @map("duration_seconds")
+  entryLatitude    Decimal  @map("entry_latitude") @db.Decimal(10, 8)
+  entryLongitude   Decimal  @map("entry_longitude") @db.Decimal(11, 8)
+  createdAt        DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([streetId])
+  @@index([entryTimestamp])
+  @@map("visited_streets")
+}
+
+
 model Settings {
   id     String @id @default(cuid())
   userId String @unique
@@ -96,6 +122,8 @@ model Settings {
 
   @@map("settings")
 }
+
+
 
 enum Language {
   En
