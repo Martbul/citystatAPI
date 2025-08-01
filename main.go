@@ -21,10 +21,10 @@ import (
 )
 
 var (
-	client        *db.PrismaClient
-	userService   *services.UserService
-	settingsService   *services.SettingsService
-	friendService *services.FriendService
+	client          *db.PrismaClient
+	userService     *services.UserService
+	settingsService *services.SettingsService
+	friendService   *services.FriendService
 )
 
 func init() {
@@ -50,7 +50,6 @@ func init() {
 	friendService = services.NewFriendService(client)
 }
 
-
 func main() {
 	defer func() {
 		if err := client.Prisma.Disconnect(); err != nil {
@@ -69,7 +68,6 @@ func main() {
 
 	r := mux.NewRouter()
 
-	
 	// Public invite routes (no auth required for initial processing)
 	r.HandleFunc("/invite", inviteHandler.ProcessInvite).Methods("GET")
 
@@ -83,10 +81,11 @@ func main() {
 	// User routes
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
-protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
+	protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
+	protected.HandleFunc("/user/note", userHandler.EditNote).Methods("PUT")
 	// Friend routes
 	protected.HandleFunc("/users/search", friendHandler.SearchUsers).Methods("GET")
-		protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
+	protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
 	protected.HandleFunc("/friends/add", friendHandler.AddFriend).Methods("POST")
 	protected.HandleFunc("/friends/list", friendHandler.GetFriends).Methods("GET")
 	protected.HandleFunc("/friends/{friendId}", friendHandler.RemoveFriend).Methods("DELETE")
@@ -98,7 +97,6 @@ protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
 	// Settings routes
 	protected.HandleFunc("/settings/account", friendHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
-
 
 	//Clerk routes
 	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")

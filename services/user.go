@@ -160,3 +160,23 @@ func (s *UserService) GetOrCreateUser(ctx context.Context, clerkUserID string) (
 
 	return nil, fmt.Errorf("database error: %w", err)
 }
+
+
+func (s *UserService) EditNote(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
+    note, ok := updates["newNote"].(string)
+    if !ok {
+        return nil, fmt.Errorf("username field is required and must be a string")
+    }
+    
+    updatedUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).Update(
+        db.User.Note.Set(note),
+    ).Exec(ctx)
+    
+    if err != nil {
+        return nil, fmt.Errorf("failed to update note: %w", err)
+    }
+    
+    return updatedUser, nil
+}

@@ -8,6 +8,7 @@ import (
 	"citystatAPI/middleware"
 	"citystatAPI/services"
 	"citystatAPI/types"
+	"citystatAPI/utils"
 )
 
 type UserHandler struct {
@@ -131,3 +132,31 @@ func (h *UserHandler) SyncProfileFromClerk(w http.ResponseWriter, r *http.Reques
 }
 
 
+
+
+
+func (h *UserHandler) EditNote(w http.ResponseWriter, r *http.Request) {
+    userID, ok := middleware.GetUserID(r)
+    if !ok {
+        middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+        return
+    }
+
+    // Use ONLY your ParseJSON helper - remove the json.NewDecoder line
+    updateReq, err := utils.ParseJSON[map[string]interface{}](r)
+    if err != nil {
+        middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+    
+    fmt.Println("req body parsed")
+    
+    user, err := h.userService.EditNote(r.Context(), userID, updateReq)
+    if err != nil {
+        middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    
+    fmt.Println("user updated successfully")
+    middleware.JSONResponse(w, user, http.StatusOK)
+}
