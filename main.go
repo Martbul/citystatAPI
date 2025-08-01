@@ -23,6 +23,7 @@ import (
 var (
 	client        *db.PrismaClient
 	userService   *services.UserService
+	settingsService   *services.SettingsService
 	friendService *services.FriendService
 )
 
@@ -45,8 +46,10 @@ func init() {
 	}
 
 	userService = services.NewUserService(client)
+	settingsService = services.NewSettingsService(client)
 	friendService = services.NewFriendService(client)
 }
+
 
 func main() {
 	defer func() {
@@ -58,6 +61,7 @@ func main() {
 	tempLogger := hclog.Default()
 
 	userHandler := appHandlers.NewUserHandler(userService)
+	settingsHandler := appHandlers.NewSettingsHandler(settingsService)
 	friendHandler := appHandlers.NewFriendHandler(friendService)
 	inviteHandler := appHandlers.NewInviteHandler(userService, friendService)
 
@@ -93,6 +97,7 @@ protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
 
 	// Settings routes
 	protected.HandleFunc("/settings/account", friendHandler.SearchUsers).Methods("GET")
+	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
 
 
 	//Clerk routes

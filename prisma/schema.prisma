@@ -9,12 +9,12 @@ datasource db {
 }
 
 model User {
-  id                String    @id // Clerk user ID
+  id                String    @id
   email             String    @unique
   firstName         String?
   lastName          String?
   userName          String?
-  imageUrl          String  @default("https://48htuluf59.ufs.sh/f/1NvBfFppWcZeWF2WCCi3zDay6IgjQLVNYHEhKiCJ8OeGwTon")
+  imageUrl          String    @default("https://48htuluf59.ufs.sh/f/1NvBfFppWcZeWF2WCCi3zDay6IgjQLVNYHEhKiCJ8OeGwTon")
   phoneNumber       String?
   cityStats         CityStat?
   role              Role      @default(USER)
@@ -23,22 +23,23 @@ model User {
   completedTutorial Boolean   @default(false)
   Settings          Settings?
 
-  friends  Friend[] @relation("FriendsFromUser")
-  friendOf Friend[] @relation("FriendsToUser")
-  note     String?  @default("")
-  status   Status   @default(ACTIVE)
-  visitedStreets      VisitedStreet[] 
+  friends        Friend[]        @relation("FriendsFromUser")
+  friendOf       Friend[]        @relation("FriendsToUser")
+  note           String?         @default("")
+  status         Status          @default(ACTIVE)
+  visitedStreets VisitedStreet[]
 
   @@map("users")
 }
+
 model Friend {
   id        String  @id @default(cuid())
   userId    String  @map("user_id")
   friendId  String  @map("friend_id")
   firstName String?
   lastName  String?
-  userName  String  
-  imageUrl  String? 
+  userName  String
+  imageUrl  String?
 
   user   User @relation("FriendsFromUser", fields: [userId], references: [id])
   friend User @relation("FriendsToUser", fields: [friendId], references: [id])
@@ -49,23 +50,22 @@ model Friend {
   @@map("user_friends")
 }
 
-
 model CityStat {
-  id                 String      @id @default(cuid())
+  id                 String       @id @default(cuid())
   name               String
   state              String
   country            String
   population         Int?
   area               Float?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  userId             String      @unique
-  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  totalStreetsWalked Int         @default(0)
-  totalKilometers    Float       @default(0)
-  cityCoveragePct    Float       @default(0)
-  daysActive         Int         @default(0)
-  longestStreakDays  Int         @default(0)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  userId             String       @unique
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalStreetsWalked Int          @default(0)
+  totalKilometers    Float        @default(0)
+  cityCoveragePct    Float        @default(0)
+  daysActive         Int          @default(0)
+  longestStreakDays  Int          @default(0)
   streetWalks        StreetWalk[]
   settingsId         String?
 
@@ -78,27 +78,26 @@ model StreetWalk {
   cityStatId String
 
   streetName String
-  geoJson    Json // Store geolocation path (e.g., Mapbox LineString)
+  geoJson    Json 
   distanceKm Float  @default(0)
 
   @@map("street_walks")
 }
 
-
 model VisitedStreet {
-  id               String   @id @default(cuid())
-  userId           String   @map("user_id")
-  sessionId        String   @map("session_id")
-  streetId         String   @map("street_id")
-  streetName       String   @map("street_name")
-  entryTimestamp   BigInt   @map("entry_timestamp")
-  exitTimestamp    BigInt?  @map("exit_timestamp")
-  durationSeconds  Int?     @map("duration_seconds")
-  entryLatitude    Decimal  @map("entry_latitude") @db.Decimal(10, 8)
-  entryLongitude   Decimal  @map("entry_longitude") @db.Decimal(11, 8)
-  createdAt        DateTime @default(now()) @map("created_at")
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  sessionId       String   @map("session_id")
+  streetId        String   @map("street_id")
+  streetName      String   @map("street_name")
+  entryTimestamp  BigInt   @map("entry_timestamp")
+  exitTimestamp   BigInt?  @map("exit_timestamp")
+  durationSeconds Int?     @map("duration_seconds")
+  entryLatitude   Decimal  @map("entry_latitude") @db.Decimal(10, 8)
+  entryLongitude  Decimal  @map("entry_longitude") @db.Decimal(11, 8)
+  createdAt       DateTime @default(now()) @map("created_at")
+
   
-  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -108,7 +107,6 @@ model VisitedStreet {
   @@map("visited_streets")
 }
 
-
 model Settings {
   id     String @id @default(cuid())
   userId String @unique
@@ -116,12 +114,14 @@ model Settings {
 
   theme    Theme    @default(Light)
   language Language @default(En)
+  enabledLocationTracking Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("settings")
 }
+
 
 
 

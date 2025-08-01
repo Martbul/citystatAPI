@@ -86,6 +86,24 @@ func (h *UserHandler) EditProfile(w http.ResponseWriter, r *http.Request) {
 	// middleware.JSONResponse(w, user, http.StatusOK)
 }
 
+// func (h *UserHandler) EditProfile(w http.ResponseWriter, r *http.Request) {
+//     // Parse into generic map
+//     var updateReq map[string]interface{}
+//     if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
+//         middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
+//         return
+//     }
+    
+//     // Pass directly to service layer
+//     user, err := h.userService.UpdateUser(r.Context(), userID, updateReq)
+//     if err != nil {
+//         middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+//         return
+//     }
+    
+//     middleware.JSONResponse(w, user, http.StatusOK)
+// }
+
 
 // SyncProfileFromClerk - separate endpoint for syncing from Clerk
 func (h *UserHandler) SyncProfileFromClerk(w http.ResponseWriter, r *http.Request) {
