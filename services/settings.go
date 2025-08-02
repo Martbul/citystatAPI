@@ -34,3 +34,22 @@ func (s *SettingsService) EditUsername(ctx context.Context, clerkUserID string, 
     
     return updatedUser, nil
 }
+
+func (s *SettingsService) EditPhoneNumber(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
+    phoneNumber, ok := updates["phone"].(string)
+    if !ok {
+        return nil, fmt.Errorf("username field is required and must be a string")
+    }
+    
+    updatedUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).Update(
+        db.User.PhoneNumber.Set(phoneNumber),
+    ).Exec(ctx)
+    
+    if err != nil {
+        return nil, fmt.Errorf("failed to update username: %w", err)
+    }
+    
+    return updatedUser, nil
+}

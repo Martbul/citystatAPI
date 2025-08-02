@@ -21,6 +21,7 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   completedTutorial Boolean   @default(false)
+  aboutMe           String?
   Settings          Settings?
 
   friends        Friend[]        @relation("FriendsFromUser")
@@ -78,7 +79,7 @@ model StreetWalk {
   cityStatId String
 
   streetName String
-  geoJson    Json 
+  geoJson    Json
   distanceKm Float  @default(0)
 
   @@map("street_walks")
@@ -97,7 +98,6 @@ model VisitedStreet {
   entryLongitude  Decimal  @map("entry_longitude") @db.Decimal(11, 8)
   createdAt       DateTime @default(now()) @map("created_at")
 
-  
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -112,18 +112,15 @@ model Settings {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  theme    Theme    @default(Light)
-  language Language @default(En)
-  enabledLocationTracking Boolean @default(false)
+  theme                   Theme    @default(Light)
+  language                Language @default(En)
+  enabledLocationTracking Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("settings")
 }
-
-
-
 
 enum Language {
   En

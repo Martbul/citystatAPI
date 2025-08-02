@@ -44,3 +44,29 @@ func (s *SettingsHandler) EditUsername(w http.ResponseWriter, r *http.Request) {
     fmt.Println("user updated successfully")
     middleware.JSONResponse(w, user, http.StatusOK)
 }
+
+func (s *SettingsHandler) EditPhoneNumbre(w http.ResponseWriter, r *http.Request) {
+    userID, ok := middleware.GetUserID(r)
+    if !ok {
+        middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+        return
+    }
+
+   
+    updateReq, err := utils.ParseJSON[map[string]interface{}](r)
+    if err != nil {
+        middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+    
+    fmt.Println("req body parsed")
+    
+    user, err := s.settingsService.EditPhoneNumber(r.Context(), userID, updateReq)
+    if err != nil {
+        middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    
+    fmt.Println("user updated successfully")
+    middleware.JSONResponse(w, user, http.StatusOK)
+}
