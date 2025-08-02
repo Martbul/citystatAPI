@@ -45,7 +45,7 @@ func (s *SettingsHandler) EditUsername(w http.ResponseWriter, r *http.Request) {
     middleware.JSONResponse(w, user, http.StatusOK)
 }
 
-func (s *SettingsHandler) EditPhoneNumbre(w http.ResponseWriter, r *http.Request) {
+func (s *SettingsHandler) EditPhoneNumber(w http.ResponseWriter, r *http.Request) {
     userID, ok := middleware.GetUserID(r)
     if !ok {
         middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
@@ -59,7 +59,7 @@ func (s *SettingsHandler) EditPhoneNumbre(w http.ResponseWriter, r *http.Request
         return
     }
     
-    fmt.Println("req body parsed")
+    fmt.Println("req body parsed for getting phone num")
     
     user, err := s.settingsService.EditPhoneNumber(r.Context(), userID, updateReq)
     if err != nil {

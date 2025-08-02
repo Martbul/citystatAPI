@@ -97,7 +97,7 @@ func main() {
 	// Settings routes
 	protected.HandleFunc("/settings/account", friendHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
-	protected.HandleFunc("/settings/phone", settingsHandler.EditPhoneNumbre).Methods("PUT")
+	protected.HandleFunc("/settings/phone", settingsHandler.EditPhoneNumber).Methods("PUT")
 
 	//Clerk routes
 	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")
