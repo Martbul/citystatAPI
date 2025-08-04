@@ -180,3 +180,20 @@ func (s *UserService) EditNote(ctx context.Context, clerkUserID string, updates 
     
     return updatedUser, nil
 }
+
+
+// Add this method to your services/user.go file
+
+func (s *UserService) UpdateUserImage(ctx context.Context, clerkUserID string, imageURL string) (*db.UserModel, error) {
+	updatedUser, err := s.client.User.FindUnique(
+		db.User.ID.Equals(clerkUserID),
+	).Update(
+		db.User.ImageURL.Set(imageURL),
+	).Exec(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user image: %w", err)
+	}
+
+	return updatedUser, nil
+}

@@ -23,6 +23,9 @@ model User {
   completedTutorial Boolean   @default(false)
   aboutMe           String?
   Settings          Settings?
+  Devices           Device?
+  disableAccount    Boolean   @default(false)
+  deleteAccount     Boolean   @default(false)
 
   friends        Friend[]        @relation("FriendsFromUser")
   friendOf       Friend[]        @relation("FriendsToUser")
@@ -112,14 +115,43 @@ model Settings {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  theme                   Theme    @default(Light)
-  language                Language @default(En)
-  enabledLocationTracking Boolean  @default(false)
+  theme                            Theme    @default(Light)
+  language                         Language @default(En)
+  enabledLocationTracking          Boolean  @default(false)
+  allowCityStatDataUsage           Boolean  @default(true)
+  allowDataPersonalizationUsage    Boolean  @default(true)
+  allowInAppRewards                Boolean  @default(true)
+  allowDataAnaliticsAndPerformance Boolean  @default(true)
+  allDevices                       Device[]
+  textSize TextSize @default(MEDIUM)
+  zoomLevel String @default("100")
+  fontStyle String @default("default")
+  messagesAllowance MessagesAllowance @default(ALLMSG)
+  showRoleColors RoleColors @default(NEXTTONAME)
+  motion Motion @default(DONTPLAYGIFWHENPOSSIBLESHOW)
+  stickersAnimation StickersAnimation @default(ALWAYS)
+  enableInAppNotifications Boolean @default(true)
+  enableSoundEffects Boolean @default(true)
+  enableVibration Boolean @default(true)
+  
+
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("settings")
+}
+
+model Device {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Settings     Settings? @relation(fields: [settingsId], references: [id])
+  settingsId   String?
+  name         String
+  location     String
+  lastLoggedIn DateTime
 }
 
 enum Language {
@@ -139,6 +171,32 @@ enum Theme {
   Auto
 }
 
+enum RoleColors {
+  NEXTTONAME
+  INNAME
+  DONTSHOW
+  SYNCPROFILECOLORS
+}
+enum Motion {
+  REDUCEDMOTION
+  SYNCWITHDEVICE
+  DONTPLAYGIFWHENPOSSIBLESHOW
+  PLAYEMOJIES
+}
+
+enum StickersAnimation {
+  ALWAYS
+  ONINTERACTION
+  NEVER
+  
+}
+
+enum MessagesAllowance {
+  ALLMSG
+  UNREADMAS
+  HIDE
+}
+
 enum Status {
   ACTIVE
   SLEEP
@@ -153,4 +211,10 @@ enum Role {
   USER
   ADMIN
   MODERATOR
+}
+
+enum TextSize {
+  BIG
+  MEDIUM
+  SMALL
 }

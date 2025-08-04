@@ -63,7 +63,7 @@ func main() {
 	settingsHandler := appHandlers.NewSettingsHandler(settingsService)
 	friendHandler := appHandlers.NewFriendHandler(friendService)
 	inviteHandler := appHandlers.NewInviteHandler(userService, friendService)
-
+	uploadHandler := appHandlers.NewUploadHandler()
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
 
 	r := mux.NewRouter()
@@ -98,6 +98,10 @@ func main() {
 	protected.HandleFunc("/settings/account", friendHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
 	protected.HandleFunc("/settings/phone", settingsHandler.EditPhoneNumber).Methods("PUT")
+
+	// Add UploadThing routes
+	protected.PathPrefix("/uploadthing").HandlerFunc(uploadHandler.UploadThingProxy)
+	protected.HandleFunc("/upload/complete", uploadHandler.HandleImageUpload).Methods("POST")
 
 	//Clerk routes
 	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")
