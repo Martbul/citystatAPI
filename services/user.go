@@ -197,3 +197,159 @@ func (s *UserService) UpdateUserImage(ctx context.Context, clerkUserID string, i
 
 	return updatedUser, nil
 }
+
+
+func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string, settingsUpdate map[string]interface{}) (*db.UserModel, error) {
+    fmt.Println("Updating user settings for:", clerkUserID)
+    fmt.Println("Settings data:", settingsUpdate)
+
+    // Ensure user exists first
+    existingUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).With(
+        db.User.Settings.Fetch(),
+    ).Exec(ctx)
+
+    if err != nil {
+        if err == db.ErrNotFound {
+            return nil, fmt.Errorf("user not found")
+        }
+        return nil, fmt.Errorf("error checking existing user: %w", err)
+    }
+
+    // Build settings update operations
+    settingsOps := []db.SettingsSetParam{}
+
+    if theme, ok := settingsUpdate["theme"].(db.Theme); ok {
+        settingsOps = append(settingsOps, db.Settings.Theme.Set(theme))
+    }
+    if language, ok := settingsUpdate["language"].(db.Language); ok {
+        settingsOps = append(settingsOps, db.Settings.Language.Set(language))
+    }
+    if textSize, ok := settingsUpdate["textSize"].(db.TextSize); ok {
+        settingsOps = append(settingsOps, db.Settings.TextSize.Set(textSize))
+    }
+    if fontStyle, ok := settingsUpdate["fontStyle"].(string); ok {
+        settingsOps = append(settingsOps, db.Settings.FontStyle.Set(fontStyle))
+    }
+    if zoomLevel, ok := settingsUpdate["zoomLevel"].(string); ok {
+        settingsOps = append(settingsOps, db.Settings.ZoomLevel.Set(zoomLevel))
+    }
+    if showRoleColors, ok := settingsUpdate["showRoleColors"].(db.RoleColors); ok {
+        settingsOps = append(settingsOps, db.Settings.ShowRoleColors.Set(showRoleColors))
+    }
+    if messagesAllowance, ok := settingsUpdate["messagesAllowance"].(db.MessagesAllowance); ok {
+        settingsOps = append(settingsOps, db.Settings.MessagesAllowance.Set(messagesAllowance))
+    }
+    if motion, ok := settingsUpdate["motion"].(db.Motion); ok {
+        settingsOps = append(settingsOps, db.Settings.Motion.Set(motion))
+    }
+    if stickersAnimation, ok := settingsUpdate["stickersAnimation"].(db.StickersAnimation); ok {
+        settingsOps = append(settingsOps, db.Settings.StickersAnimation.Set(stickersAnimation))
+    }
+    
+    // Boolean settings
+    if enabledLocationTracking, ok := settingsUpdate["enabledLocationTracking"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.EnabledLocationTracking.Set(enabledLocationTracking))
+    }
+    if allowCityStatDataUsage, ok := settingsUpdate["allowCityStatDataUsage"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.AllowCityStatDataUsage.Set(allowCityStatDataUsage))
+    }
+    if allowDataPersonalizationUsage, ok := settingsUpdate["allowDataPersonalizationUsage"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.AllowDataPersonalizationUsage.Set(allowDataPersonalizationUsage))
+    }
+    if allowInAppRewards, ok := settingsUpdate["allowInAppRewards"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.AllowInAppRewards.Set(allowInAppRewards))
+    }
+    if allowDataAnaliticsAndPerformance, ok := settingsUpdate["allowDataAnaliticsAndPerformance"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.AllowDataAnaliticsAndPerformance.Set(allowDataAnaliticsAndPerformance))
+    }
+    if enableInAppNotifications, ok := settingsUpdate["enableInAppNotifications"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.EnableInAppNotifications.Set(enableInAppNotifications))
+    }
+    if enableSoundEffects, ok := settingsUpdate["enableSoundEffects"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.EnableSoundEffects.Set(enableSoundEffects))
+    }
+    if enableVibration, ok := settingsUpdate["enableVibration"].(bool); ok {
+        settingsOps = append(settingsOps, db.Settings.EnableVibration.Set(enableVibration))
+    }
+
+    if len(settingsOps) == 0 {
+        return existingUser, nil
+    }
+
+    // Check if user has settings record
+    settings, hasSettings := existingUser.Settings()
+    if !hasSettings || settings == nil {
+        // Create new settings record
+        _, err = s.client.Settings.CreateOne(
+            db.Settings.User.Link(db.User.ID.Equals(clerkUserID)),
+            settingsOps...,
+        ).Exec(ctx)
+        if err != nil {
+            return nil, fmt.Errorf("failed to create settings: %w", err)
+        }
+    } else {
+        // Update existing settings
+        _, err = s.client.Settings.FindUnique(
+            db.Settings.UserID.Equals(clerkUserID),
+        ).Update(settingsOps...).Exec(ctx)
+        if err != nil {
+            return nil, fmt.Errorf("failed to update settings: %w", err)
+        }
+    }
+
+    // Return updated user with settings
+    updatedUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).With(
+        db.User.Settings.Fetch(),
+        db.User.Friends.Fetch(),
+        db.User.CityStats.Fetch().With(
+            db.CityStat.StreetWalks.Fetch(),
+        ),
+    ).Exec(ctx)
+
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch updated user: %w", err)
+    }
+
+    return updatedUser, nil
+}
+
+// UpdateUserProfile handles mixed user and settings updates
+func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
+    fmt.Println("Updating user profile for:", clerkUserID)
+    fmt.Println("Profile data:", updates)
+
+    // Check if this is a settings-only update
+    if settingsData, hasSettings := updates["settings"]; hasSettings {
+        if settingsMap, ok := settingsData.(map[string]interface{}); ok {
+            return s.UpdateUserSettings(ctx, clerkUserID, settingsMap)
+        }
+    }
+
+    // Handle regular user field updates
+    return s.UpdateUser(ctx, clerkUserID, types.UserUpdateRequest{
+        FirstName:         getStringPointer(updates, "firstName"),
+        LastName:          getStringPointer(updates, "lastName"),
+        UserName:          getStringPointer(updates, "userName"),
+        ImageURL:          getStringPointer(updates, "imageURL"),
+        CompletedTutorial: getBoolPointer(updates, "completedTutorial"),
+    })
+}
+
+// Helper functions
+func getStringPointer(data map[string]interface{}, key string) *string {
+    if val, ok := data[key].(string); ok {
+        return &val
+    }
+    return nil
+}
+
+func getBoolPointer(data map[string]interface{}, key string) *bool {
+    if val, ok := data[key].(bool); ok {
+        return &val
+    }
+    return nil
+}
