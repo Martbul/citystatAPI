@@ -23,7 +23,7 @@ model User {
   completedTutorial Boolean   @default(false)
   aboutMe           String?
   Settings          Settings?
-  // Devices           Device?
+  Devices           Device?
   disableAccount    Boolean   @default(false)
   deleteAccount     Boolean   @default(false)
 
@@ -111,7 +111,8 @@ model VisitedStreet {
 }
 
 model Settings {
-  userId String @id
+  id     String @id @default(cuid())
+  userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   
@@ -123,7 +124,7 @@ model Settings {
   allowDataPersonalizationUsage    Boolean  @default(true)
   allowInAppRewards                Boolean  @default(true)
   allowDataAnaliticsAndPerformance Boolean  @default(true)
-  // allDevices                       Device[]
+  allDevices                       Device[]
   textSize TextSize @default(MEDIUM)
   zoomLevel String @default("100")
   fontStyle String @default("default")
@@ -144,31 +145,16 @@ model Settings {
   @@map("settings")
 }
 
-// model Device {
-//   id           String    @id @default(cuid())
-//   userId       String    @unique
-//   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-//   Settings     Settings @relation(fields: [settingsId], references: [id])
-//   settingsId   String?
-//   name         String
-//   location     String
-//   lastLoggedIn DateTime
-// }
-
-
-// model Device {
-//   id           String    @id @default(cuid())
-//   userId       String    @unique
-//   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-//   settingsId   String?
-//   Settings     Settings  @relation(fields: [settingsId], references: [userId])
-
-//   name         String
-//   location     String
-//   lastLoggedIn DateTime
-// }
-
+model Device {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Settings     Settings? @relation(fields: [settingsId], references: [id])
+  settingsId   String?
+  name         String
+  location     String
+  lastLoggedIn DateTime
+}
 
 enum Language {
   En
