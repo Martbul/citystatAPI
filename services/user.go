@@ -25,6 +25,8 @@ func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, update
 	// Ensure user exists first
 	existingUser, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
+	).With(
+		db.User.Settings.Fetch(),
 	).Exec(ctx)
 
 	if err != nil {

@@ -16,22 +16,6 @@ func NewSettingsHandler(settingsService *services.SettingsService) *SettingsHand
 	return &SettingsHandler{settingsService: settingsService}
 }
 
-func (s *SettingsHandler) GetUserSettings(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r)
-	if !ok {
-		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-
-    settings, err := s.settingsService.GetUserSettings(r.Context(), userID)
-    if err != nil {
-		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	fmt.Println("user get user settings")
-	middleware.JSONResponse(w, settings, http.StatusOK)
-}
 
 func (s *SettingsHandler) EditUsername(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
