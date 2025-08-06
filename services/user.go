@@ -213,6 +213,8 @@ func (s *UserService) GetOrCreateUser(ctx context.Context, clerkUserID string) (
 	// Try to get user from database first
 	user, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
+	).With(
+		db.User.Settings.Fetch(),
 	).Exec(ctx)
 
 	if err == nil {
