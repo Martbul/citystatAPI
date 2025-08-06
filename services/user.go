@@ -14,7 +14,6 @@ type UserService struct {
 	client *db.PrismaClient
 }
 
-
 func NewUserService(client *db.PrismaClient) *UserService {
 	return &UserService{client: client}
 }
@@ -77,97 +76,105 @@ func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, update
 	return updatedUser, nil
 }
 func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
-    // Get user from Clerk
-    fmt.Println("clerk sync ")
+	fmt.Printf("[SyncUserFromClerk] Starting sync for Clerk user ID: %s\n", clerkUserID)
 
-    clerkUser, err := user.Get(ctx, clerkUserID)
-    if err != nil {
-        return nil, fmt.Errorf("failed to fetch user from Clerk: %w", err)
-    }
+	clerkUser, err := user.Get(ctx, clerkUserID)
+	if err != nil {
+		fmt.Printf("[SyncUserFromClerk] Error fetching user from Clerk: %v\n", err)
+		return nil, fmt.Errorf("failed to fetch user from Clerk: %w", err)
+	}
+	fmt.Printf("[SyncUserFromClerk] Clerk user fetched: %+v\n", clerkUser)
 
-    // Prepare user data
-    var email string
-    if len(clerkUser.EmailAddresses) > 0 {
-        email = clerkUser.EmailAddresses[0].EmailAddress
-    }
+	var email string
+	if len(clerkUser.EmailAddresses) > 0 {
+		email = clerkUser.EmailAddresses[0].EmailAddress
+		fmt.Printf("[SyncUserFromClerk] Using email: %s\n", email)
+	} else {
+		fmt.Printf("[SyncUserFromClerk] No email addresses found for Clerk user\n")
+	}
 
-    var imageUrl *string
-    if clerkUser.ImageURL != nil && *clerkUser.ImageURL != "" {
-        imageUrl = clerkUser.ImageURL
-    }
+	var imageUrl *string
+	if clerkUser.ImageURL != nil && *clerkUser.ImageURL != "" {
+		imageUrl = clerkUser.ImageURL
+		fmt.Printf("[SyncUserFromClerk] Using image URL: %s\n", *imageUrl)
+	} else {
+		fmt.Printf("[SyncUserFromClerk] No image URL found for Clerk user\n")
+	}
 
-    // Try to find existing user
-    existingUser, err := s.client.User.FindUnique(
-        db.User.ID.Equals(clerkUserID),
-    ).Exec(ctx)
-    if err != nil && err != db.ErrNotFound {
-        return nil, fmt.Errorf("error checking existing user: %w", err)
-    }
+	existingUser, err := s.client.User.FindUnique(
+		db.User.ID.Equals(clerkUserID),
+	).Exec(ctx)
+	if err != nil && err != db.ErrNotFound {
+		fmt.Printf("[SyncUserFromClerk] Error checking existing user in DB: %v\n", err)
+		return nil, fmt.Errorf("error checking existing user: %w", err)
+	}
+	if existingUser != nil {
+		fmt.Printf("[SyncUserFromClerk] User exists in DB, updating...\n")
+		updatedUser, err := s.client.User.FindUnique(
+			db.User.ID.Equals(clerkUserID),
+		).Update(
+			db.User.Email.Set(email),
+			db.User.FirstName.SetIfPresent(clerkUser.FirstName),
+			db.User.LastName.SetIfPresent(clerkUser.LastName),
+			db.User.ImageURL.SetIfPresent(imageUrl),
+		).Exec(ctx)
+		if err != nil {
+			fmt.Printf("[SyncUserFromClerk] Failed to update user in DB: %v\n", err)
+			return nil, fmt.Errorf("failed to update user: %w", err)
+		}
+		fmt.Printf("[SyncUserFromClerk] User updated in DB: %+v\n", updatedUser)
 
-    // User exists, update it
-    if existingUser != nil {
-        updatedUser, err := s.client.User.FindUnique(
-            db.User.ID.Equals(clerkUserID),
-        ).Update(
-            db.User.Email.Set(email),
-            db.User.FirstName.SetIfPresent(clerkUser.FirstName),
-            db.User.LastName.SetIfPresent(clerkUser.LastName),
-            db.User.ImageURL.SetIfPresent(imageUrl),
-        ).Exec(ctx)
-        if err != nil {
-            return nil, fmt.Errorf("failed to update user: %w", err)
-        }
+		err = s.ensureUserHasSettings(ctx, clerkUserID)
+		if err != nil {
+			fmt.Printf("[SyncUserFromClerk] Failed to ensure user has settings: %v\n", err)
+			return nil, fmt.Errorf("failed to ensure user has settings: %w", err)
+		}
+		fmt.Printf("[SyncUserFromClerk] User settings ensured\n")
+		return updatedUser, nil
+	}
 
-        // Ensure existing user has settings
-        err = s.ensureUserHasSettings(ctx, clerkUserID)
-        if err != nil {
-            return nil, fmt.Errorf("failed to ensure user has settings: %w", err)
-        }
+	fmt.Printf("[SyncUserFromClerk] User does not exist in DB, creating new user...\n")
+	newUser, err := s.client.User.CreateOne(
+		db.User.ID.Set(clerkUserID),
+		db.User.Email.Set(email),
+		db.User.FirstName.SetIfPresent(clerkUser.FirstName),
+		db.User.LastName.SetIfPresent(clerkUser.LastName),
+		db.User.UserName.SetIfPresent(clerkUser.Username),
+		db.User.ImageURL.SetIfPresent(imageUrl),
+	).Exec(ctx)
+	if err != nil {
+		fmt.Printf("[SyncUserFromClerk] Failed to create user in DB: %v\n", err)
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	fmt.Printf("[SyncUserFromClerk] New user created in DB: %+v\n", newUser)
 
-        return updatedUser, nil
-    }
+	_, err = s.client.User.FindUnique(db.User.ID.Equals(clerkUserID)).Exec(ctx)
+	if err != nil {
+		fmt.Printf("[SyncUserFromClerk] User not found after creation when creating settings: %v\n", err)
+		val := fmt.Errorf("user not found when creating settings: %w", err)
+		return nil, val
+	}
 
-    // User doesn't exist, create new one
-    newUser, err := s.client.User.CreateOne(
-        db.User.ID.Set(clerkUserID),
-        db.User.Email.Set(email),
-        db.User.FirstName.SetIfPresent(clerkUser.FirstName),
-        db.User.LastName.SetIfPresent(clerkUser.LastName),
-        db.User.UserName.SetIfPresent(clerkUser.Username),
-        db.User.ImageURL.SetIfPresent(imageUrl),
-    ).Exec(ctx)
-    if err != nil {
-        return nil, fmt.Errorf("failed to create user: %w", err)
-    }
+	err = s.ensureUserHasSettings(ctx, clerkUserID)
+	if err != nil {
+		fmt.Printf("[SyncUserFromClerk] Failed to ensure new user has settings: %v\n", err)
+		return nil, fmt.Errorf("failed to ensure new user has settings: %w", err)
+	}
+	fmt.Printf("[SyncUserFromClerk] New user settings ensured\n")
 
-    // Ensure the new user has settings immediately after creation
-    err = s.ensureUserHasSettings(ctx, clerkUserID)
-    if err != nil {
-        // Since user creation succeeded, you may want to return the user
-        // and log the settings error, or return an error depending on your business logic.
-        // For this fix, we'll return an error to be explicit.
-        return nil, fmt.Errorf("failed to ensure new user has settings: %w", err)
-    }
-    
-    return newUser, nil
+	return newUser, nil
 }
 
-
-
 func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) error {
-	fmt.Println("enshuring user has settings")
-	// Check if settings already exist
-	_, err := s.client.Settings.FindUnique(
+	fmt.Printf("[ensureUserHasSettings] Ensuring settings for user ID: %s\n", userID)
+	settings, err := s.client.Settings.FindUnique(
 		db.Settings.UserID.Equals(userID),
 	).Exec(ctx)
 
 	if err == db.ErrNotFound {
-		fmt.Println("user doest have settings -> creating settings")
-
-		// Settings don't exist, create them
-		_, err = s.client.Settings.CreateOne(
+		fmt.Printf("[ensureUserHasSettings] Settings not found for user ID: %s, creating default settings...\n", userID)
+		settingsCreate, err := s.client.Settings.CreateOne(
 			db.Settings.User.Link(db.User.ID.Equals(userID)),
-			// Add default values for required fields below (example fields, replace with your actual required fields)
 			db.Settings.Theme.Set(db.ThemeAuto),
 			db.Settings.Language.Set(db.LanguageEn),
 			db.Settings.TextSize.Set(db.TextSizeMedium),
@@ -175,22 +182,27 @@ func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) 
 			db.Settings.ZoomLevel.Set("100"),
 			db.Settings.ShowRoleColors.Set(db.RoleColorsNexttoname),
 			db.Settings.MessagesAllowance.Set(db.MessagesAllowanceAllmsg),
-			db.Settings.Motion.Set(db.MotionSyncwithdevice),
+			db.Settings.Motion.Set(db.MotionDontplaygifwhenpossibleshow),
 			db.Settings.StickersAnimation.Set(db.StickersAnimationAlways),
 			db.Settings.EnabledLocationTracking.Set(false),
-			db.Settings.AllowCityStatDataUsage.Set(false),
-			db.Settings.AllowDataPersonalizationUsage.Set(false),
-			db.Settings.AllowInAppRewards.Set(false),
-			db.Settings.AllowDataAnaliticsAndPerformance.Set(false),
-			db.Settings.EnableInAppNotifications.Set(false),
-			db.Settings.EnableSoundEffects.Set(false),
-			db.Settings.EnableVibration.Set(false),
+			db.Settings.AllowCityStatDataUsage.Set(true),
+			db.Settings.AllowDataPersonalizationUsage.Set(true),
+			db.Settings.AllowInAppRewards.Set(true),
+			db.Settings.AllowDataAnaliticsAndPerformance.Set(true),
+			db.Settings.EnableInAppNotifications.Set(true),
+			db.Settings.EnableSoundEffects.Set(true),
+			db.Settings.EnableVibration.Set(true),
 		).Exec(ctx)
 		if err != nil {
+			fmt.Printf("[ensureUserHasSettings] Failed to create settings for user ID: %s, error: %v\n", userID, err)
 			return fmt.Errorf("failed to create settings: %w", err)
 		}
+		fmt.Printf("[ensureUserHasSettings] Default settings created for user ID: %s: %+v\n", userID, settingsCreate)
 	} else if err != nil {
+		fmt.Printf("[ensureUserHasSettings] Error checking settings for user ID: %s, error: %v\n", userID, err)
 		return fmt.Errorf("error checking settings: %w", err)
+	} else {
+		fmt.Printf("[ensureUserHasSettings] Settings already exist for user ID: %s: %+v\n", userID, settings)
 	}
 
 	return nil
@@ -378,17 +390,6 @@ func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string,
 		if settingsMap, ok := settingsData.(map[string]interface{}); ok {
 			return s.UpdateUserSettings(ctx, clerkUserID, settingsMap)
 		}
-	}
-
-	_, err := s.client.Settings.CreateOne(
-		db.Settings.User.Link(
-			db.User.ID.Equals(clerkUserID),
-		),
-	).Exec(ctx)
-
-	if err != nil {
-		fmt.Println("error tring to create user settings with update of the profile")
-		fmt.Println(err)
 	}
 
 	// Handle regular user field updates
