@@ -442,6 +442,17 @@ func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string,
 		}
 	}
 
+	_, err := s.client.Settings.CreateOne(
+		db.Settings.User.Link(
+			db.User.ID.Equals(clerkUserID),
+		),
+	).Exec(ctx)
+
+	if err != nil {
+		fmt.Println("error tring to create user settings with update of the profile")
+		fmt.Println(err)
+	}
+
 	// Handle regular user field updates
 	return s.UpdateUser(ctx, clerkUserID, types.UserUpdateRequest{
 		FirstName:         getStringPointer(updates, "firstName"),
