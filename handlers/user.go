@@ -106,7 +106,6 @@ func (h *UserHandler) EditProfile(w http.ResponseWriter, r *http.Request) {
 // }
 
 
-// SyncProfileFromClerk - separate endpoint for syncing from Clerk
 func (h *UserHandler) SyncProfileFromClerk(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
@@ -161,9 +160,7 @@ func (h *UserHandler) EditNote(w http.ResponseWriter, r *http.Request) {
     middleware.JSONResponse(w, user, http.StatusOK)
 }
 
-// Add these methods to your handlers/user.go file
 
-// UpdateUserSettings handles PUT /user/settings  
 func (h *UserHandler) UpdateUserSettings(w http.ResponseWriter, r *http.Request) {
     userID, ok := middleware.GetUserID(r)
     if !ok {
@@ -196,7 +193,6 @@ func (h *UserHandler) UpdateUserProfile(w http.ResponseWriter, r *http.Request) 
         return
     }
 
-    // Parse into generic map to handle both user fields and settings
     var updateReq map[string]interface{}
     if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
         middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)

@@ -266,9 +266,138 @@ func (s *UserService) UpdateUserImage(ctx context.Context, clerkUserID string, i
 	return updatedUser, nil
 }
 
+// func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string, settingsUpdate map[string]interface{}) (*db.UserModel, error) {
+// 	fmt.Println("Updating user settings for:", clerkUserID)
+// 	fmt.Println("Settings data:", settingsUpdate)
+
+// 	// Ensure user exists first
+// 	existingUser, err := s.client.User.FindUnique(
+// 		db.User.ID.Equals(clerkUserID),
+// 	).With(
+// 		db.User.Settings.Fetch(),
+// 	).Exec(ctx)
+
+// 	if err != nil {
+// 		if err == db.ErrNotFound {
+// 			return nil, fmt.Errorf("user not found")
+// 		}
+// 		return nil, fmt.Errorf("error checking existing user: %w", err)
+// 	}
+
+// 	// Build settings update operations
+// 	settingsOps := []db.SettingsSetParam{}
+
+// 	if theme, ok := settingsUpdate["theme"].(db.Theme); ok {
+// 		settingsOps = append(settingsOps, db.Settings.Theme.Set(theme))
+// 	}
+// 	if language, ok := settingsUpdate["language"].(db.Language); ok {
+// 		settingsOps = append(settingsOps, db.Settings.Language.Set(language))
+// 	}
+// 	if textSize, ok := settingsUpdate["textSize"].(db.TextSize); ok {
+// 		settingsOps = append(settingsOps, db.Settings.TextSize.Set(textSize))
+// 	}
+// 	if fontStyle, ok := settingsUpdate["fontStyle"].(string); ok {
+// 		settingsOps = append(settingsOps, db.Settings.FontStyle.Set(fontStyle))
+// 	}
+// 	if zoomLevel, ok := settingsUpdate["zoomLevel"].(string); ok {
+// 		settingsOps = append(settingsOps, db.Settings.ZoomLevel.Set(zoomLevel))
+// 	}
+// 	if showRoleColors, ok := settingsUpdate["showRoleColors"].(db.RoleColors); ok {
+// 		settingsOps = append(settingsOps, db.Settings.ShowRoleColors.Set(showRoleColors))
+// 	}
+// 	if messagesAllowance, ok := settingsUpdate["messagesAllowance"].(db.MessagesAllowance); ok {
+// 		settingsOps = append(settingsOps, db.Settings.MessagesAllowance.Set(messagesAllowance))
+// 	}
+// 	if motion, ok := settingsUpdate["motion"].(db.Motion); ok {
+// 		settingsOps = append(settingsOps, db.Settings.Motion.Set(motion))
+// 	}
+// 	if stickersAnimation, ok := settingsUpdate["stickersAnimation"].(db.StickersAnimation); ok {
+// 		settingsOps = append(settingsOps, db.Settings.StickersAnimation.Set(stickersAnimation))
+// 	}
+
+// 	// Boolean settings
+// 	if enabledLocationTracking, ok := settingsUpdate["enabledLocationTracking"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.EnabledLocationTracking.Set(enabledLocationTracking))
+// 	}
+// 	if allowCityStatDataUsage, ok := settingsUpdate["allowCityStatDataUsage"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.AllowCityStatDataUsage.Set(allowCityStatDataUsage))
+// 	}
+// 	if allowDataPersonalizationUsage, ok := settingsUpdate["allowDataPersonalizationUsage"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.AllowDataPersonalizationUsage.Set(allowDataPersonalizationUsage))
+// 	}
+// 	if allowInAppRewards, ok := settingsUpdate["allowInAppRewards"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.AllowInAppRewards.Set(allowInAppRewards))
+// 	}
+// 	if allowDataAnaliticsAndPerformance, ok := settingsUpdate["allowDataAnaliticsAndPerformance"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.AllowDataAnaliticsAndPerformance.Set(allowDataAnaliticsAndPerformance))
+// 	}
+// 	if enableInAppNotifications, ok := settingsUpdate["enableInAppNotifications"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.EnableInAppNotifications.Set(enableInAppNotifications))
+// 	}
+// 	if enableSoundEffects, ok := settingsUpdate["enableSoundEffects"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.EnableSoundEffects.Set(enableSoundEffects))
+// 	}
+// 	if enableVibration, ok := settingsUpdate["enableVibration"].(bool); ok {
+// 		settingsOps = append(settingsOps, db.Settings.EnableVibration.Set(enableVibration))
+// 	}
+
+// 	if len(settingsOps) == 0 {
+// 		return existingUser, nil
+// 	}
+
+// fmt.Println("settings opts:")
+// 	fmt.Println(settingsOps)
+
+// 	// Check if user has settings record
+// 	settings, hasSettings := existingUser.Settings()
+// 	if !hasSettings || settings == nil {
+// 		// Create new settings record
+// 		_, err = s.client.Settings.CreateOne(
+// 			db.Settings.User.Link(db.User.ID.Equals(clerkUserID)),
+// 			settingsOps...,
+// 		).Exec(ctx)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to create settings: %w", err)
+// 		}
+// 	} else {
+// 		// Update existing settings
+// 		_, err = s.client.Settings.FindUnique(
+// 			db.Settings.UserID.Equals(clerkUserID),
+// 		).Update(settingsOps...).Exec(ctx)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to update settings: %w", err)
+// 		}
+// 	}
+
+// 	// Return updated user with settings
+// 	updatedUser, err := s.client.User.FindUnique(
+// 		db.User.ID.Equals(clerkUserID),
+// 	).With(
+// 		db.User.Settings.Fetch(),
+// 		db.User.Friends.Fetch(),
+// 		db.User.CityStats.Fetch().With(
+// 			db.CityStat.StreetWalks.Fetch(),
+// 		),
+// 	).Exec(ctx)
+
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to fetch updated user: %w", err)
+// 	}
+
+// 	return updatedUser, nil
+// }
+
 func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string, settingsUpdate map[string]interface{}) (*db.UserModel, error) {
 	fmt.Println("Updating user settings for:", clerkUserID)
-	fmt.Println("Settings data:", settingsUpdate)
+	fmt.Println("Settings data (raw):", settingsUpdate)
+
+	// Extract nested settings map if present
+	rawSettings := settingsUpdate
+	if nested, ok := settingsUpdate["settings"].(map[string]interface{}); ok {
+		rawSettings = nested
+	}
+
+	fmt.Println("Parsed settings:", rawSettings)
 
 	// Ensure user exists first
 	existingUser, err := s.client.User.FindUnique(
@@ -287,68 +416,71 @@ func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string
 	// Build settings update operations
 	settingsOps := []db.SettingsSetParam{}
 
-	if theme, ok := settingsUpdate["theme"].(db.Theme); ok {
-		settingsOps = append(settingsOps, db.Settings.Theme.Set(theme))
+	if themeStr, ok := rawSettings["theme"].(string); ok {
+		settingsOps = append(settingsOps, db.Settings.Theme.Set(db.Theme(themeStr)))
 	}
-	if language, ok := settingsUpdate["language"].(db.Language); ok {
-		settingsOps = append(settingsOps, db.Settings.Language.Set(language))
+	if languageStr, ok := rawSettings["language"].(string); ok {
+		settingsOps = append(settingsOps, db.Settings.Language.Set(db.Language(languageStr)))
 	}
-	if textSize, ok := settingsUpdate["textSize"].(db.TextSize); ok {
-		settingsOps = append(settingsOps, db.Settings.TextSize.Set(textSize))
+	if textSizeStr, ok := rawSettings["textSize"].(string); ok {
+		settingsOps = append(settingsOps, db.Settings.TextSize.Set(db.TextSize(textSizeStr)))
 	}
-	if fontStyle, ok := settingsUpdate["fontStyle"].(string); ok {
+	if fontStyle, ok := rawSettings["fontStyle"].(string); ok {
 		settingsOps = append(settingsOps, db.Settings.FontStyle.Set(fontStyle))
 	}
-	if zoomLevel, ok := settingsUpdate["zoomLevel"].(string); ok {
+	if zoomLevel, ok := rawSettings["zoomLevel"].(string); ok {
 		settingsOps = append(settingsOps, db.Settings.ZoomLevel.Set(zoomLevel))
 	}
-	if showRoleColors, ok := settingsUpdate["showRoleColors"].(db.RoleColors); ok {
-		settingsOps = append(settingsOps, db.Settings.ShowRoleColors.Set(showRoleColors))
+	if showRoleColorsStr, ok := rawSettings["showRoleColors"].(string); ok {
+		settingsOps = append(settingsOps, db.Settings.ShowRoleColors.Set(db.RoleColors(showRoleColorsStr)))
 	}
-	if messagesAllowance, ok := settingsUpdate["messagesAllowance"].(db.MessagesAllowance); ok {
-		settingsOps = append(settingsOps, db.Settings.MessagesAllowance.Set(messagesAllowance))
+	if messagesAllowanceStr, ok := rawSettings["messagesAllowance"].(string); ok {
+		settingsOps = append(settingsOps, db.Settings.MessagesAllowance.Set(db.MessagesAllowance(messagesAllowanceStr)))
 	}
-	if motion, ok := settingsUpdate["motion"].(db.Motion); ok {
-		settingsOps = append(settingsOps, db.Settings.Motion.Set(motion))
+	if motionStr, ok := rawSettings["motion"].(string); ok {
+		settingsOps = append(settingsOps, db.Settings.Motion.Set(db.Motion(motionStr)))
 	}
-	if stickersAnimation, ok := settingsUpdate["stickersAnimation"].(db.StickersAnimation); ok {
-		settingsOps = append(settingsOps, db.Settings.StickersAnimation.Set(stickersAnimation))
+	if stickersAnimationStr, ok := rawSettings["stickersAnimation"].(string); ok {
+		settingsOps = append(settingsOps, db.Settings.StickersAnimation.Set(db.StickersAnimation(stickersAnimationStr)))
 	}
 
 	// Boolean settings
-	if enabledLocationTracking, ok := settingsUpdate["enabledLocationTracking"].(bool); ok {
+	if enabledLocationTracking, ok := rawSettings["enabledLocationTracking"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.EnabledLocationTracking.Set(enabledLocationTracking))
 	}
-	if allowCityStatDataUsage, ok := settingsUpdate["allowCityStatDataUsage"].(bool); ok {
+	if allowCityStatDataUsage, ok := rawSettings["allowCityStatDataUsage"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.AllowCityStatDataUsage.Set(allowCityStatDataUsage))
 	}
-	if allowDataPersonalizationUsage, ok := settingsUpdate["allowDataPersonalizationUsage"].(bool); ok {
+	if allowDataPersonalizationUsage, ok := rawSettings["allowDataPersonalizationUsage"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.AllowDataPersonalizationUsage.Set(allowDataPersonalizationUsage))
 	}
-	if allowInAppRewards, ok := settingsUpdate["allowInAppRewards"].(bool); ok {
+	if allowInAppRewards, ok := rawSettings["allowInAppRewards"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.AllowInAppRewards.Set(allowInAppRewards))
 	}
-	if allowDataAnaliticsAndPerformance, ok := settingsUpdate["allowDataAnaliticsAndPerformance"].(bool); ok {
+	if allowDataAnaliticsAndPerformance, ok := rawSettings["allowDataAnaliticsAndPerformance"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.AllowDataAnaliticsAndPerformance.Set(allowDataAnaliticsAndPerformance))
 	}
-	if enableInAppNotifications, ok := settingsUpdate["enableInAppNotifications"].(bool); ok {
+	if enableInAppNotifications, ok := rawSettings["enableInAppNotifications"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.EnableInAppNotifications.Set(enableInAppNotifications))
 	}
-	if enableSoundEffects, ok := settingsUpdate["enableSoundEffects"].(bool); ok {
+	if enableSoundEffects, ok := rawSettings["enableSoundEffects"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.EnableSoundEffects.Set(enableSoundEffects))
 	}
-	if enableVibration, ok := settingsUpdate["enableVibration"].(bool); ok {
+	if enableVibration, ok := rawSettings["enableVibration"].(bool); ok {
 		settingsOps = append(settingsOps, db.Settings.EnableVibration.Set(enableVibration))
 	}
 
 	if len(settingsOps) == 0 {
+		fmt.Println("No valid settings provided to update.")
 		return existingUser, nil
 	}
+
+	fmt.Println("Settings operations to apply:", settingsOps)
 
 	// Check if user has settings record
 	settings, hasSettings := existingUser.Settings()
 	if !hasSettings || settings == nil {
-		// Create new settings record
+		fmt.Println("Creating new settings record")
 		_, err = s.client.Settings.CreateOne(
 			db.Settings.User.Link(db.User.ID.Equals(clerkUserID)),
 			settingsOps...,
@@ -357,7 +489,7 @@ func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string
 			return nil, fmt.Errorf("failed to create settings: %w", err)
 		}
 	} else {
-		// Update existing settings
+		fmt.Println("Updating existing settings record")
 		_, err = s.client.Settings.FindUnique(
 			db.Settings.UserID.Equals(clerkUserID),
 		).Update(settingsOps...).Exec(ctx)
@@ -383,6 +515,8 @@ func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string
 
 	return updatedUser, nil
 }
+
+
 
 // UpdateUserProfile handles mixed user and settings updates
 func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {

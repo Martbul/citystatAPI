@@ -94,11 +94,10 @@ func main() {
 	protected.HandleFunc("/invite/accept", inviteHandler.AcceptInvite).Methods("POST")
 	protected.HandleFunc("/invite/link", inviteHandler.GetInviteLink).Methods("GET")
 
-	protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT") // This should handle both user fields and settings
-	protected.HandleFunc("/settings", settingsHandler.GetUserSettings).Methods("GET") // This should handle both user fields and settings
-
-	protected.HandleFunc("/user/settings", userHandler.UpdateUserSettings).Methods("PUT") // Dedicated settings endpoint
 	// Settings routes
+	protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT")
+	protected.HandleFunc("/settings", settingsHandler.GetUserSettings).Methods("GET")
+	protected.HandleFunc("/user/settings", userHandler.UpdateUserSettings).Methods("PUT")
 	protected.HandleFunc("/settings/account", friendHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
 	protected.HandleFunc("/settings/phone", settingsHandler.EditPhoneNumber).Methods("PUT")
