@@ -16,7 +16,19 @@ func NewSettingsService(client *db.PrismaClient) *SettingsService {
 	return &SettingsService{client: client}
 }
 
+func (s *SettingsService) GetUserSettings(ctx context.Context, clerkUserID string) (*db.SettingsModel, error) {
+    settings, err := s.client.Settings.FindUnique(
+            db.Settings.UserID.Equals(clerkUserID),
+        ).Exec(ctx)
 
+    if err != nil {
+        return nil, fmt.Errorf("failed to retrieve user settings: %w", err)
+    }
+    if settings == nil {
+        return nil, fmt.Errorf("settings not found for user ID: %s", clerkUserID)
+    }
+    return settings, nil
+}
 
 func (s *SettingsService) EditUsername(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
     username, ok := updates["username"].(string)

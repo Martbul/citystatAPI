@@ -95,6 +95,7 @@ func main() {
 	protected.HandleFunc("/invite/link", inviteHandler.GetInviteLink).Methods("GET")
 
 	protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT") // This should handle both user fields and settings
+	protected.HandleFunc("/settings", settingsHandler.GetUserSettings).Methods("GET") // This should handle both user fields and settings
 
 	protected.HandleFunc("/user/settings", userHandler.UpdateUserSettings).Methods("PUT") // Dedicated settings endpoint
 	// Settings routes
