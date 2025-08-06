@@ -14,6 +14,7 @@ type UserService struct {
 	client *db.PrismaClient
 }
 
+
 func NewUserService(client *db.PrismaClient) *UserService {
 	return &UserService{client: client}
 }
@@ -150,89 +151,8 @@ func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string)
     
     return newUser, nil
 }
-// func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
-// 	// Get user from Clerk
-// 		fmt.Println("clerk sync ")
 
-// 	clerkUser, err := user.Get(ctx, clerkUserID)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to fetch user from Clerk: %w", err)
-// 	}
 
-// 	// Prepare user data
-// 	var email string
-// 	if len(clerkUser.EmailAddresses) > 0 {
-// 		email = clerkUser.EmailAddresses[0].EmailAddress
-// 	}
-
-// 	var imageUrl *string
-// 	if clerkUser.ImageURL != nil && *clerkUser.ImageURL != "" {
-// 		imageUrl = clerkUser.ImageURL
-// 	}
-
-// 	// Try to find existing user
-// 	existingUser, err := s.client.User.FindUnique(
-// 		db.User.ID.Equals(clerkUserID),
-// 	).Exec(ctx)
-// 	if err != nil && err != db.ErrNotFound {
-// 		return nil, fmt.Errorf("error checking existing user: %w", err)
-// 	}
-
-// 	// User exists, update it
-// 	if existingUser != nil {
-// 		updatedUser, err := s.client.User.FindUnique(
-// 			db.User.ID.Equals(clerkUserID),
-// 		).Update(
-// 			db.User.Email.Set(email),
-// 			db.User.FirstName.SetIfPresent(clerkUser.FirstName),
-// 			db.User.LastName.SetIfPresent(clerkUser.LastName),
-// 			db.User.ImageURL.SetIfPresent(imageUrl),
-// 		).Exec(ctx)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to update user: %w", err)
-// 		}
-
-// 		// Ensure existing user has settings (in case they were created before settings were implemented)
-// 		err = s.ensureUserHasSettings(ctx, clerkUserID)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to ensure user has settings: %w", err)
-// 		}
-
-// 		return updatedUser, nil
-// 	}
-
-// 	// User doesn't exist, create new one
-// 	newUser, err := s.client.User.CreateOne(
-// 		db.User.ID.Set(clerkUserID),
-// 		db.User.Email.Set(email),
-// 		db.User.FirstName.SetIfPresent(clerkUser.FirstName),
-// 		db.User.LastName.SetIfPresent(clerkUser.LastName),
-// 		db.User.UserName.SetIfPresent(clerkUser.Username),
-// 		db.User.ImageURL.SetIfPresent(imageUrl),
-// 	).Exec(ctx)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to create user: %w", err)
-// 	}
-
-// 	fmt.Println("create default settings for the new user")
-
-// 	// Create default settings for the new user
-// 	_, err = s.client.Settings.CreateOne(
-// 		db.Settings.User.Link(db.User.ID.Equals(clerkUserID)),
-// 		// Optionally set explicit defaults (or rely on schema defaults)
-// 		// db.Settings.Theme.Set(db.ThemeLight),
-// 		// db.Settings.Language.Set(db.LanguageEn),
-// 		// db.Settings.EnabledLocationTracking.Set(false),
-// 		// ... other explicit defaults if needed
-// 	).Exec(ctx)
-// 	if err != nil {
-// 		// Log the error but don't fail user creation since user was already created
-// 		// You might want to handle this differently based on your requirements
-// 		return nil, fmt.Errorf("failed to create user settings: %w", err)
-// 	}
-
-// 	return newUser, nil
-// }
 
 func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) error {
 	fmt.Println("enshuring user has settings")
@@ -247,6 +167,24 @@ func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) 
 		// Settings don't exist, create them
 		_, err = s.client.Settings.CreateOne(
 			db.Settings.User.Link(db.User.ID.Equals(userID)),
+			// Add default values for required fields below (example fields, replace with your actual required fields)
+			db.Settings.Theme.Set(db.ThemeAuto),
+			db.Settings.Language.Set(db.LanguageEn),
+			db.Settings.TextSize.Set(db.TextSizeMedium),
+			db.Settings.FontStyle.Set("default"),
+			db.Settings.ZoomLevel.Set("100"),
+			db.Settings.ShowRoleColors.Set(db.RoleColorsNexttoname),
+			db.Settings.MessagesAllowance.Set(db.MessagesAllowanceAllmsg),
+			db.Settings.Motion.Set(db.MotionSyncwithdevice),
+			db.Settings.StickersAnimation.Set(db.StickersAnimationAlways),
+			db.Settings.EnabledLocationTracking.Set(false),
+			db.Settings.AllowCityStatDataUsage.Set(false),
+			db.Settings.AllowDataPersonalizationUsage.Set(false),
+			db.Settings.AllowInAppRewards.Set(false),
+			db.Settings.AllowDataAnaliticsAndPerformance.Set(false),
+			db.Settings.EnableInAppNotifications.Set(false),
+			db.Settings.EnableSoundEffects.Set(false),
+			db.Settings.EnableVibration.Set(false),
 		).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to create settings: %w", err)
