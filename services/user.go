@@ -18,7 +18,7 @@ func NewUserService(client *db.PrismaClient) *UserService {
 	return &UserService{client: client}
 }
 
-func (s *UserService) UpdateUser(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
+func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
 	fmt.Println("updating user")
 
 	fmt.Println(updates)
@@ -531,7 +531,7 @@ func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string,
 	}
 
 	// Handle regular user field updates
-	return s.UpdateUser(ctx, clerkUserID, types.UserUpdateRequest{
+	return s.UpdateUserDetails(ctx, clerkUserID, types.UserUpdateRequest{
 		FirstName:         getStringPointer(updates, "firstName"),
 		LastName:          getStringPointer(updates, "lastName"),
 		UserName:          getStringPointer(updates, "userName"),
@@ -553,4 +553,53 @@ func getBoolPointer(data map[string]interface{}, key string) *bool {
 		return &val
 	}
 	return nil
+}
+
+
+
+func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username string) ([]types.UserSearchResult, error) {
+	// Get current user's friends to check friend status
+	currentUserFriends, err := s.client.Friend.FindMany(
+		db.Friend.UserID.Equals(currentUserID),
+	).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user friends: %w", err)
+	}
+
+	// Create a map for quick friend lookup
+	friendMap := make(map[string]bool)
+	for _, friend := range currentUserFriends {
+		friendMap[friend.FriendID] = true
+	}
+
+	// Search for users by username (case-insensitive partial matching)
+	users, err := s.client.User.FindMany(
+		db.User.And(
+			db.User.UserName.Contains(username),
+			db.User.ID.Not(currentUserID), // Exclude current user
+		),
+	).Take(10).Exec(ctx) // Limit to 10 results
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+
+	// Convert to response format with friend status
+	results := make([]types.UserSearchResult, len(users))
+	for i, user := range users {
+		firstName, _ := user.FirstName()
+		lastName, _ := user.LastName()
+		userName, _ := user.UserName()
+		imageURL:= user.ImageURL
+		results[i] = types.UserSearchResult{
+			ID:        user.ID,
+			UserName:  &userName,
+			FirstName: &firstName,
+			LastName:  &lastName,
+			ImageURL:  &imageURL,
+			IsFriend:  friendMap[user.ID],
+		}
+	}
+
+	return results, nil
 }

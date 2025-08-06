@@ -15,52 +15,7 @@ type FriendService struct {
 func NewFriendService(client *db.PrismaClient) *FriendService {
 	return &FriendService{client: client}
 }
-func (s *FriendService) SearchUsers(ctx context.Context, currentUserID, username string) ([]types.UserSearchResult, error) {
-	// Get current user's friends to check friend status
-	currentUserFriends, err := s.client.Friend.FindMany(
-		db.Friend.UserID.Equals(currentUserID),
-	).Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current user friends: %w", err)
-	}
 
-	// Create a map for quick friend lookup
-	friendMap := make(map[string]bool)
-	for _, friend := range currentUserFriends {
-		friendMap[friend.FriendID] = true
-	}
-
-	// Search for users by username (case-insensitive partial matching)
-	users, err := s.client.User.FindMany(
-		db.User.And(
-			db.User.UserName.Contains(username),
-			db.User.ID.Not(currentUserID), // Exclude current user
-		),
-	).Take(10).Exec(ctx) // Limit to 10 results
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to search users: %w", err)
-	}
-
-	// Convert to response format with friend status
-	results := make([]types.UserSearchResult, len(users))
-	for i, user := range users {
-		firstName, _ := user.FirstName()
-		lastName, _ := user.LastName()
-		userName, _ := user.UserName()
-		imageURL:= user.ImageURL
-		results[i] = types.UserSearchResult{
-			ID:        user.ID,
-			UserName:  &userName,
-			FirstName: &firstName,
-			LastName:  &lastName,
-			ImageURL:  &imageURL,
-			IsFriend:  friendMap[user.ID],
-		}
-	}
-
-	return results, nil
-}
 
 func (s *FriendService) AddFriend(ctx context.Context, userID, friendID string) (*types.UserSearchResult, error) {
 	// Check if friend user exists

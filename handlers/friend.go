@@ -21,35 +21,7 @@ func NewFriendHandler(friendService *services.FriendService) *FriendHandler {
 	return &FriendHandler{friendService: friendService}
 }
 
-func (h *FriendHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r)
-	if !ok {
-		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
-		return
-	}
 
-	username := r.URL.Query().Get("username")
-	fmt.Println("Searching for users with username:", username)
-	if username == "" {
-		middleware.ErrorResponse(w, "Username parameter is required", http.StatusBadRequest)
-		return
-	}
-
-	username = strings.TrimSpace(username)
-	if len(username) < 1 {
-		middleware.ErrorResponse(w, "Username must be at least 1 character", http.StatusBadRequest)
-		return
-	}
-
-	users, err := h.friendService.SearchUsers(r.Context(), userID, username)
-	if err != nil {
-		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	response := types.SearchUsersResponse{Users: users}
-	middleware.JSONResponse(w, response, http.StatusOK)
-}
 
 // AddFriend handles POST /api/friends/add
 func (h *FriendHandler) AddFriend(w http.ResponseWriter, r *http.Request) {

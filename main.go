@@ -80,11 +80,13 @@ func main() {
 
 	// User routes
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
-	protected.HandleFunc("/user", userHandler.UpdateProfile).Methods("PUT")
+	protected.HandleFunc("/user/details", userHandler.UpdateUserDetails).Methods("PUT")
+	protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT")
 	protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
 	protected.HandleFunc("/user/note", userHandler.EditNote).Methods("PUT")
+	protected.HandleFunc("/users/search", userHandler.SearchUsers).Methods("GET")
+
 	// Friend routes
-	protected.HandleFunc("/users/search", friendHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
 	protected.HandleFunc("/friends/add", friendHandler.AddFriend).Methods("POST")
 	protected.HandleFunc("/friends/list", friendHandler.GetFriends).Methods("GET")
@@ -95,10 +97,9 @@ func main() {
 	protected.HandleFunc("/invite/link", inviteHandler.GetInviteLink).Methods("GET")
 
 	// Settings routes
-	protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT")
 	protected.HandleFunc("/settings", settingsHandler.GetUserSettings).Methods("GET")
 	protected.HandleFunc("/user/settings", userHandler.UpdateUserSettings).Methods("PUT")
-	protected.HandleFunc("/settings/account", friendHandler.SearchUsers).Methods("GET")
+	protected.HandleFunc("/settings/account", userHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
 	protected.HandleFunc("/settings/phone", settingsHandler.EditPhoneNumber).Methods("PUT")
 

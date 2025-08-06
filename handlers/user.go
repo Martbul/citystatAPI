@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"citystatAPI/middleware"
 	"citystatAPI/services"
@@ -36,7 +37,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	middleware.JSONResponse(w, user, http.StatusOK)
 }
 
-func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
 		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
@@ -52,7 +53,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("req body parsed")
 
 	// Update user with the provided data
-	user, err := h.userService.UpdateUser(r.Context(), userID, updateReq)
+	user, err := h.userService.UpdateUserDetails(r.Context(), userID, updateReq)
 	if err != nil {
 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -209,4 +210,35 @@ func (h *UserHandler) UpdateUserProfile(w http.ResponseWriter, r *http.Request) 
     
     fmt.Println("Profile updated successfully")
     middleware.JSONResponse(w, user, http.StatusOK)
+}
+
+
+func (h *UserHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	username := r.URL.Query().Get("username")
+	fmt.Println("Searching for users with username:", username)
+	if username == "" {
+		middleware.ErrorResponse(w, "Username parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	username = strings.TrimSpace(username)
+	if len(username) < 1 {
+		middleware.ErrorResponse(w, "Username must be at least 1 character", http.StatusBadRequest)
+		return
+	}
+
+	users, err := h.userService.SearchUsers(r.Context(), userID, username)
+	if err != nil {
+		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := types.SearchUsersResponse{Users: users}
+	middleware.JSONResponse(w, response, http.StatusOK)
 }
