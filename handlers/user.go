@@ -189,7 +189,6 @@ func (h *UserHandler) UpdateUserSettings(w http.ResponseWriter, r *http.Request)
     middleware.JSONResponse(w, user, http.StatusOK)
 }
 
-// UpdateUserProfile handles partial user updates including settings
 func (h *UserHandler) UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
     userID, ok := middleware.GetUserID(r)
     if !ok {

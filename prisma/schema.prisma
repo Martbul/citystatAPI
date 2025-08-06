@@ -117,7 +117,7 @@ model Settings {
 
   
 
-  theme                            Theme    @default(Light)
+  theme                            Theme    @default(LIGHT)
   language                         Language @default(En)
   enabledLocationTracking          Boolean  @default(false)
   allowCityStatDataUsage           Boolean  @default(true)
@@ -168,9 +168,9 @@ enum Language {
 }
 
 enum Theme {
-  Light
-  Dark
-  Auto
+  LIGHT
+  DARK
+  SYSTEM
 }
 
 enum RoleColors {

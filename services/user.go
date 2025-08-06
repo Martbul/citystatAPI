@@ -175,7 +175,7 @@ func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) 
 		fmt.Printf("[ensureUserHasSettings] Settings not found for user ID: %s, creating default settings...\n", userID)
 		settingsCreate, err := s.client.Settings.CreateOne(
 			db.Settings.User.Link(db.User.ID.Equals(userID)),
-			db.Settings.Theme.Set(db.ThemeAuto),
+			db.Settings.Theme.Set(db.ThemeSystem),
 			db.Settings.Language.Set(db.LanguageEn),
 			db.Settings.TextSize.Set(db.TextSizeMedium),
 			db.Settings.FontStyle.Set("default"),
