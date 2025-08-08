@@ -115,8 +115,6 @@ model Settings {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  
-
   theme                            Theme    @default(LIGHT)
   language                         Language @default(En)
   enabledLocationTracking          Boolean  @default(false)
@@ -135,9 +133,6 @@ model Settings {
   enableInAppNotifications Boolean @default(true)
   enableSoundEffects Boolean @default(true)
   enableVibration Boolean @default(true)
-  
-
-
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

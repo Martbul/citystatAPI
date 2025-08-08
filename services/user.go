@@ -210,6 +210,9 @@ func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) 
 	return nil
 }
 
+
+//TODO: Create method for ensuring user has citystat, walked_streets, and so on models
+
 // GetOrCreateUser ensures user exists in database
 func (s *UserService) GetOrCreateUser(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
 	// Try to get user from database first

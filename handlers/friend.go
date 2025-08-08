@@ -23,7 +23,6 @@ func NewFriendHandler(friendService *services.FriendService) *FriendHandler {
 
 
 
-// AddFriend handles POST /api/friends/add
 func (h *FriendHandler) AddFriend(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
@@ -70,7 +69,6 @@ func (h *FriendHandler) AddFriend(w http.ResponseWriter, r *http.Request) {
 	middleware.JSONResponse(w, response, http.StatusOK)
 }
 
-// GetFriends handles GET /api/friends/list
 func (h *FriendHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("getting friends")
 	userID, ok := middleware.GetUserID(r)

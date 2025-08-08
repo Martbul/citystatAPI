@@ -25,6 +25,7 @@ var (
 	userService     *services.UserService
 	settingsService *services.SettingsService
 	friendService   *services.FriendService
+	visitorService  *services.VisitorService
 )
 
 func init() {
@@ -48,6 +49,8 @@ func init() {
 	userService = services.NewUserService(client)
 	settingsService = services.NewSettingsService(client)
 	friendService = services.NewFriendService(client)
+	visitorService = services.NewVisitorService(client)
+
 }
 
 func main() {
@@ -61,6 +64,7 @@ func main() {
 
 	userHandler := appHandlers.NewUserHandler(userService)
 	settingsHandler := appHandlers.NewSettingsHandler(settingsService)
+	visitorHandler := appHandlers.NewVisitorHandler(visitorService)
 	friendHandler := appHandlers.NewFriendHandler(friendService)
 	inviteHandler := appHandlers.NewInviteHandler(userService, friendService)
 	uploadHandler := appHandlers.NewUploadHandler()
@@ -102,6 +106,11 @@ func main() {
 	protected.HandleFunc("/settings/account", userHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
 	protected.HandleFunc("/settings/phone", settingsHandler.EditPhoneNumber).Methods("PUT")
+
+	// Visitor routes
+	protected.HandleFunc("/visitor/locationPermission", visitorHandler.GetLocationPermission).Methods("GET")
+	protected.HandleFunc("/visitor/locationPermission", visitorHandler.SaveLocationPermission).Methods("POST")
+	// protected.HandleFunc("/visitor/streets", visitorHandler.AddVisitedStreets).Methods("POST")
 
 	// Add UploadThing routes
 	protected.PathPrefix("/uploadthing").HandlerFunc(uploadHandler.UploadThingProxy)
