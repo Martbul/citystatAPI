@@ -216,6 +216,8 @@ func (h *WebhookHandler) ensureUserHasSettings(ctx context.Context, userID strin
 	return nil
 }
 
+
+
 func (h *WebhookHandler) handleUserUpdated(w http.ResponseWriter, data map[string]interface{}) {
 	userData := h.parseUserData(data)
 	if userData == nil {

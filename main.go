@@ -110,7 +110,7 @@ func main() {
 	// Visitor routes
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.GetLocationPermission).Methods("GET")
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.SaveLocationPermission).Methods("POST")
-	// protected.HandleFunc("/visitor/streets", visitorHandler.AddVisitedStreets).Methods("POST")
+	protected.HandleFunc("/visitor/streets", visitorHandler.SaveVisitedStreets).Methods("POST")
 
 	// Add UploadThing routes
 	protected.PathPrefix("/uploadthing").HandlerFunc(uploadHandler.UploadThingProxy)

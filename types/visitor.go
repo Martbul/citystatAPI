@@ -8,12 +8,18 @@ type SaveLocationPermitionResponse struct {
 	Success bool `json:"success"`
 }
 
-
-type AddVisitedStreetsRequest struct {
-	FriendID string `json:"friendId"`
+//! ai generated check it
+type SaveVisitedStreetsRequest struct {
+    SessionID      string                   `json:"sessionId"`
+    VisitedStreets []VisitedStreetRequest   `json:"visitedStreets"`
 }
 
-type AddVisitedStreetsResponse struct {
-	Message string             `json:"message"`
-	Friend  UserSearchResult   `json:"friend"`
+type VisitedStreetRequest struct {
+    StreetID        string   `json:"streetId"`
+    StreetName      string   `json:"streetName"`
+    EntryTimestamp  int64    `json:"entryTimestamp"`
+    ExitTimestamp   *int64   `json:"exitTimestamp,omitempty"`
+    DurationSeconds *int     `json:"durationSeconds,omitempty"`
+    EntryLatitude   float64  `json:"entryLatitude"`
+    EntryLongitude  float64  `json:"entryLongitude"`
 }
