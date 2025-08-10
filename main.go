@@ -110,6 +110,7 @@ func main() {
 	// Visitor routes
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.GetLocationPermission).Methods("GET")
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.SaveLocationPermission).Methods("POST")
+		protected.HandleFunc("/visitor/streets", visitorHandler.GetVisitedStreets).Methods("GET")
 	protected.HandleFunc("/visitor/streets", visitorHandler.SaveVisitedStreets).Methods("POST")
 
 	// Add UploadThing routes

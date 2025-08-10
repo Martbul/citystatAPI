@@ -113,3 +113,39 @@ func (s *VisitorService) SaveVisitedStreets(ctx context.Context, clerkUserID str
 	
 	return nil
 }
+func (s *VisitorService) GetVisitedStreets(ctx context.Context, clerkUserID string) ([]types.VisitedStreetResponse, error) {
+	records, err := s.client.VisitedStreet.FindMany(
+		db.VisitedStreet.UserID.Equals(clerkUserID),
+	).Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	visited := make([]types.VisitedStreetResponse, 0, len(records))
+	for _, rec := range records {
+		street := types.VisitedStreetResponse{
+			SessionID:      rec.SessionID,
+			StreetID:       rec.StreetID,
+			StreetName:     rec.StreetName,
+			EntryTimestamp: int64(rec.EntryTimestamp),
+			EntryLatitude:  rec.EntryLatitude.InexactFloat64(),
+			EntryLongitude: rec.EntryLongitude.InexactFloat64(),
+		}
+
+		// ExitTimestamp is a method, not a pointer
+		if val, ok := rec.ExitTimestamp(); ok {
+			exit := int64(val)
+			street.ExitTimestamp = &exit
+		}
+
+		// DurationSeconds is a method, not a pointer
+		if val, ok := rec.DurationSeconds(); ok {
+			duration := int64(val)
+			street.DurationSeconds = &duration
+		}
+
+		visited = append(visited, street)
+	}
+
+	return visited, nil
+}

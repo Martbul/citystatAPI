@@ -86,3 +86,23 @@ func (h *VisitorHandler) SaveVisitedStreets(w http.ResponseWriter, r *http.Reque
 
     middleware.JSONResponse(w, map[string]string{"status": "success"}, http.StatusOK)
 }
+
+
+func (h *VisitorHandler) GetVisitedStreets(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		middleware.ErrorResponse(w, "User ID not found", http.StatusUnauthorized)
+		return
+	}
+
+	visitedStreets, err := h.visitorService.GetVisitedStreets(r.Context(), userID)
+	if err != nil {
+		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	middleware.JSONResponse(w, map[string]interface{}{
+		"status":          "success",
+		"visited_streets": visitedStreets,
+	}, http.StatusOK)
+}

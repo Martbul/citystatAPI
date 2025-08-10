@@ -23,3 +23,14 @@ type VisitedStreetRequest struct {
     EntryLatitude   float64  `json:"entryLatitude"`
     EntryLongitude  float64  `json:"entryLongitude"`
 }
+
+type VisitedStreetResponse struct {
+	SessionID       string   `json:"session_id"`
+	StreetID        string   `json:"street_id"`
+	StreetName      string   `json:"street_name"`
+	EntryTimestamp  int64    `json:"entry_timestamp"`
+	EntryLatitude   float64  `json:"entry_latitude"`
+	EntryLongitude  float64  `json:"entry_longitude"`
+	ExitTimestamp   *int64   `json:"exit_timestamp,omitempty"`
+	DurationSeconds *int64   `json:"duration_seconds,omitempty"`
+}
