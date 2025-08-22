@@ -141,15 +141,15 @@ type GetUserFriendsRow struct {
 }
 
 // sql/queries/friends.sql
-func (q *Queries) GetUserFriends(ctx context.Context, userID string) ([]UserFriend, error) {
+func (q *Queries) GetUserFriends(ctx context.Context, userID string) ([]GetUserFriendsRow, error) {
 	rows, err := q.db.Query(ctx, getUserFriends, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []UserFriend
+	var items []GetUserFriendsRow
 	for rows.Next() {
-		var i UserFriend
+		var i GetUserFriendsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.FriendID,

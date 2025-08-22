@@ -60,8 +60,8 @@ func (r *visitorRepository) CreateVisitedStreet(ctx context.Context, params Crea
 			Int32: int32Value(params.DurationSeconds),
 			Valid: params.DurationSeconds != nil,
 		},
-		EntryLatitude:  decimal.NewFromFloat(params.EntryLatitude),
-		EntryLongitude: decimal.NewFromFloat(params.EntryLongitude),
+		EntryLatitude:  decimalToNumeric(params.EntryLatitude),
+		EntryLongitude: decimalToNumeric(params.EntryLongitude),
 	}
 
 	street, err := r.queries.CreateVisitedStreet(ctx, sqlcParams)
@@ -108,4 +108,11 @@ func int32Value(i *int32) int32 {
 		return *i
 	}
 	return 0
+}
+
+func decimalToNumeric(f float64) pgtype.Numeric {
+	var n pgtype.Numeric
+	dec := decimal.NewFromFloat(f)
+	_ = n.Scan(dec.String())
+	return n
 }

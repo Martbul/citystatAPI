@@ -111,10 +111,9 @@ WHERE user_name ILIKE '%' || $2 || '%'
 AND id != $1
 LIMIT 10
 `
-
 type SearchUsersParams struct {
-	ID      string      `json:"id"`
-	Column2 pgtype.Text `json:"column_2"`
+	ID       string      `json:"id"`
+	UserName pgtype.Text `json:"user_name"`
 }
 
 type SearchUsersRow struct {
@@ -125,10 +124,8 @@ type SearchUsersRow struct {
 	ImageUrl  pgtype.Text `json:"image_url"`
 }
 
-
-
 func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
-	rows, err := q.db.Query(ctx, searchUsers, arg.ID, arg.Column2)
+	rows, err := q.db.Query(ctx, searchUsers, arg.ID, arg.UserName)
 	if err != nil {
 		return nil, err
 	}

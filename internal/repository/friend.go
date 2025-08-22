@@ -39,7 +39,20 @@ func (r *friendRepository) GetUserFriends(ctx context.Context, userID string) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user friends: %w", err)
 	}
-	return friends, nil
+
+	userFriends := make([]db.UserFriend, len(friends))
+	for i, f := range friends {
+		userFriends[i] = db.UserFriend{
+			UserID:    f.ID,
+			FriendID:  f.FriendID,
+			UserName:  f.UserName,
+			FirstName: f.FirstName,
+			LastName:  f.LastName,
+			ImageUrl:  f.ImageUrl,
+		}
+	}
+
+	return userFriends, nil
 }
 
 func (r *friendRepository) CreateFriend(ctx context.Context, params CreateFriendParams) (*db.UserFriend, error) {

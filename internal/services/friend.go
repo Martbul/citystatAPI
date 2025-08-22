@@ -42,7 +42,7 @@ func (s *FriendService) AddFriend(ctx context.Context, userID, friendID string) 
 	_, err = s.friendRepo.CreateFriend(ctx, repository.CreateFriendParams{
 		UserID:    userID,
 		FriendID:  friendID,
-		UserName:  stringFromPgtype(friendUser.UserName),
+		UserName:  stringValueFromPgtype(friendUser.UserName),
 		FirstName: stringFromPgtype(friendUser.FirstName),
 		LastName:  stringFromPgtype(friendUser.LastName),
 		ImageURL:  stringFromPgtype(friendUser.ImageUrl),
@@ -57,7 +57,7 @@ func (s *FriendService) AddFriend(ctx context.Context, userID, friendID string) 
 		_, err = s.friendRepo.CreateFriend(ctx, repository.CreateFriendParams{
 			UserID:    friendID,
 			FriendID:  userID,
-			UserName:  stringFromPgtype(currentUser.UserName),
+			UserName:  stringValueFromPgtype(currentUser.UserName),
 			FirstName: stringFromPgtype(currentUser.FirstName),
 			LastName:  stringFromPgtype(currentUser.LastName),
 			ImageURL:  stringFromPgtype(currentUser.ImageUrl),
@@ -94,7 +94,7 @@ func (s *FriendService) GetUserFriends(ctx context.Context, userID string) ([]ty
 			FirstName: stringFromPgtype(friend.FirstName),
 			LastName:  stringFromPgtype(friend.LastName),
 			ImageURL:  stringFromPgtype(friend.ImageUrl),
-			CreatedAt: friend.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt: friend.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 

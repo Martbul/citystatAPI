@@ -142,9 +142,29 @@ func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username s
 	return results, nil
 }
 
-// Helper function to convert pgtype.Text to *string
+// Helper function to convert possible *string or string to *string
 func stringFromPgtype(pgText interface{}) *string {
-	// This will need to be implemented based on your pgx/v5 types
-	// The exact implementation depends on how SQLC generates the types
-	return nil // Placeholder
+	switch v := pgText.(type) {
+	case *string:
+		return v
+	case string:
+		return &v
+	default:
+		return nil
+	}
+}
+
+// Returns string value, or empty string if nil or not a string
+func stringValueFromPgtype(pgText interface{}) string {
+	switch v := pgText.(type) {
+	case *string:
+		if v != nil {
+			return *v
+		}
+		return ""
+	case string:
+		return v
+	default:
+		return ""
+	}
 }

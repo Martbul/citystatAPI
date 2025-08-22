@@ -8,7 +8,6 @@ import (
 
 	"citystatAPI/internal/middleware"
 	"citystatAPI/internal/services"
-	"citystatAPI/utils"
 )
 
 type SettingsHandler struct {
@@ -63,47 +62,11 @@ func (h *SettingsHandler) UpdateUserSettings(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *SettingsHandler) EditUsername(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r)
-	if !ok {
-		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-
-	updateReq, err := utils.ParseJSON[map[string]interface{}](r)
-	if err != nil {
-		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	username, ok := updateReq["username"].(string)
-	if !ok {
-		middleware.ErrorResponse(w, "username field is required and must be a string", http.StatusBadRequest)
-		return
-	}
-
 	// This should be handled by the user service, not settings service
 	middleware.ErrorResponse(w, "Username editing not implemented in this refactor", http.StatusNotImplemented)
 }
 
 func (h *SettingsHandler) EditPhoneNumber(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r)
-	if !ok {
-		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
-		return
-	}
-
-	updateReq, err := utils.ParseJSON[map[string]interface{}](r)
-	if err != nil {
-		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	phone, ok := updateReq["phone"].(string)
-	if !ok {
-		middleware.ErrorResponse(w, "phone field is required and must be a string", http.StatusBadRequest)
-		return
-	}
-
 	// This should be handled by the user service, not settings service
 	middleware.ErrorResponse(w, "Phone number editing not implemented in this refactor", http.StatusNotImplemented)
 }

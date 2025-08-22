@@ -111,12 +111,25 @@ func (r *userRepository) UpdateUser(ctx context.Context, params UpdateUserParams
 }
 
 func (r *userRepository) SearchUsers(ctx context.Context, currentUserID, username string) ([]db.User, error) {
-	users, err := r.queries.SearchUsers(ctx, db.SearchUsersParams{
+	usersRows, err := r.queries.SearchUsers(ctx, db.SearchUsersParams{
 		ID:       currentUserID,
-		UserName: username,
+		UserName: pgtype.Text{String: username, Valid: username != ""},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+
+	// Convert []db.SearchUsersRow to []db.User
+	var users []db.User
+	for _, row := range usersRows {
+		users = append(users, db.User{
+			ID:                row.ID,
+			FirstName:         row.FirstName,
+			LastName:          row.LastName,
+			UserName:          row.UserName,
+			ImageUrl:          row.ImageUrl,
+			
+		})
 	}
 	return users, nil
 }

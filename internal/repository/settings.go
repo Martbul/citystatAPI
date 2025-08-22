@@ -81,24 +81,75 @@ func (r *settingsRepository) GetUserSettings(ctx context.Context, userID string)
 
 func (r *settingsRepository) CreateUserSettings(ctx context.Context, params CreateSettingsParams) (*db.Setting, error) {
 	sqlcParams := db.CreateUserSettingsParams{
-		UserID:                           params.UserID,
-		Theme:                            getTheme(params.Theme),
-		Language:                         getLanguage(params.Language),
-		TextSize:                         getTextSize(params.TextSize),
-		ZoomLevel:                        getStringOrDefault(params.ZoomLevel, "100"),
-		FontStyle:                        getStringOrDefault(params.FontStyle, "default"),
-		MessagesAllowance:                getMessagesAllowance(params.MessagesAllowance),
-		ShowRoleColors:                   getRoleColors(params.ShowRoleColors),
-		Motion:                           getMotion(params.Motion),
-		StickersAnimation:                getStickersAnimation(params.StickersAnimation),
-		EnabledLocationTracking:          getBoolOrDefault(params.EnabledLocationTracking, false),
-		AllowCityStatDataUsage:           getBoolOrDefault(params.AllowCityStatDataUsage, true),
-		AllowDataPersonalizationUsage:    getBoolOrDefault(params.AllowDataPersonalizationUsage, true),
-		AllowInAppRewards:                getBoolOrDefault(params.AllowInAppRewards, true),
-		AllowDataAnalyticsAndPerformance: getBoolOrDefault(params.AllowDataAnalyticsAndPerformance, true),
-		EnableInAppNotifications:         getBoolOrDefault(params.EnableInAppNotifications, true),
-		EnableSoundEffects:               getBoolOrDefault(params.EnableSoundEffects, true),
-		EnableVibration:                  getBoolOrDefault(params.EnableVibration, true),
+		UserID: params.UserID,
+		Theme: db.NullTheme{
+			Theme: getTheme(params.Theme),
+			Valid: params.Theme != nil,
+		},
+		Language: db.NullLanguage{
+			Language: getLanguage(params.Language),
+			Valid:    params.Language != nil,
+		},
+		TextSize: db.NullTextSize{
+			TextSize: getTextSize(params.TextSize),
+			Valid:    params.TextSize != nil,
+		},
+		ZoomLevel: pgtype.Text{
+			String: getStringOrDefault(params.ZoomLevel, "100"),
+			Valid:  params.ZoomLevel != nil,
+		},
+		FontStyle: pgtype.Text{
+			String: getStringOrDefault(params.FontStyle, "default"),
+			Valid:  params.FontStyle != nil,
+		},
+		MessagesAllowance: db.NullMessagesAllowance{
+			MessagesAllowance: getMessagesAllowance(params.MessagesAllowance),
+			Valid:             params.MessagesAllowance != nil,
+		},
+		ShowRoleColors: db.NullRoleColors{
+			RoleColors: getRoleColors(params.ShowRoleColors),
+			Valid:      params.ShowRoleColors != nil,
+		},
+		Motion: db.NullMotion{
+			Motion: getMotion(params.Motion),
+			Valid:  params.Motion != nil,
+		},
+		StickersAnimation: db.NullStickersAnimation{
+			StickersAnimation: getStickersAnimation(params.StickersAnimation),
+			Valid:             params.StickersAnimation != nil,
+		},
+		EnabledLocationTracking: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.EnabledLocationTracking, false),
+			Valid: params.EnabledLocationTracking != nil,
+		},
+		AllowCityStatDataUsage: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.AllowCityStatDataUsage, true),
+			Valid: params.AllowCityStatDataUsage != nil,
+		},
+		AllowDataPersonalizationUsage: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.AllowDataPersonalizationUsage, true),
+			Valid: params.AllowDataPersonalizationUsage != nil,
+		},
+		AllowInAppRewards: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.AllowInAppRewards, true),
+			Valid: params.AllowInAppRewards != nil,
+		},
+		AllowDataAnalyticsAndPerformance: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.AllowDataAnalyticsAndPerformance, true),
+			Valid: params.AllowDataAnalyticsAndPerformance != nil,
+		},
+		EnableInAppNotifications: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.EnableInAppNotifications, true),
+			Valid: params.EnableInAppNotifications != nil,
+		},
+		EnableSoundEffects: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.EnableSoundEffects, true),
+			Valid: params.EnableSoundEffects != nil,
+		},
+		EnableVibration: pgtype.Bool{
+			Bool:  getBoolOrDefault(params.EnableVibration, true),
+			Valid: params.EnableVibration != nil,
+		},
 	}
 
 	settings, err := r.queries.CreateUserSettings(ctx, sqlcParams)
@@ -111,17 +162,17 @@ func (r *settingsRepository) CreateUserSettings(ctx context.Context, params Crea
 func (r *settingsRepository) UpdateUserSettings(ctx context.Context, params UpdateSettingsParams) (*db.Setting, error) {
 	sqlcParams := db.UpdateUserSettingsParams{
 		UserID: params.UserID,
-		Theme: pgtype.Text{
-			String: string(getTheme(params.Theme)),
-			Valid:  params.Theme != nil,
+		Theme: db.NullTheme{
+			Theme: getTheme(params.Theme),
+			Valid: params.Theme != nil,
 		},
-		Language: pgtype.Text{
-			String: string(getLanguage(params.Language)),
-			Valid:  params.Language != nil,
+		Language: db.NullLanguage{
+			Language: getLanguage(params.Language),
+			Valid:    params.Language != nil,
 		},
-		TextSize: pgtype.Text{
-			String: string(getTextSize(params.TextSize)),
-			Valid:  params.TextSize != nil,
+		TextSize: db.NullTextSize{
+			TextSize: getTextSize(params.TextSize),
+			Valid:    params.TextSize != nil,
 		},
 		ZoomLevel: pgtype.Text{
 			String: stringValue(params.ZoomLevel),
@@ -131,21 +182,21 @@ func (r *settingsRepository) UpdateUserSettings(ctx context.Context, params Upda
 			String: stringValue(params.FontStyle),
 			Valid:  params.FontStyle != nil,
 		},
-		MessagesAllowance: pgtype.Text{
-			String: string(getMessagesAllowance(params.MessagesAllowance)),
-			Valid:  params.MessagesAllowance != nil,
+		MessagesAllowance: db.NullMessagesAllowance{
+			MessagesAllowance: getMessagesAllowance(params.MessagesAllowance),
+			Valid:             params.MessagesAllowance != nil,
 		},
-		ShowRoleColors: pgtype.Text{
-			String: string(getRoleColors(params.ShowRoleColors)),
-			Valid:  params.ShowRoleColors != nil,
+		ShowRoleColors: db.NullRoleColors{
+			RoleColors: getRoleColors(params.ShowRoleColors),
+			Valid:      params.ShowRoleColors != nil,
 		},
-		Motion: pgtype.Text{
-			String: string(getMotion(params.Motion)),
+		Motion: db.NullMotion{
+			Motion: getMotion(params.Motion),
 			Valid:  params.Motion != nil,
 		},
-		StickersAnimation: pgtype.Text{
-			String: string(getStickersAnimation(params.StickersAnimation)),
-			Valid:  params.StickersAnimation != nil,
+		StickersAnimation: db.NullStickersAnimation{
+			StickersAnimation: getStickersAnimation(params.StickersAnimation),
+			Valid:             params.StickersAnimation != nil,
 		},
 		EnabledLocationTracking: pgtype.Bool{
 			Bool:  boolValue(params.EnabledLocationTracking),
@@ -191,12 +242,12 @@ func (r *settingsRepository) UpdateUserSettings(ctx context.Context, params Upda
 func (r *settingsRepository) UpdateLocationPermission(ctx context.Context, userID string, enabled bool) (bool, error) {
 	result, err := r.queries.UpdateLocationPermission(ctx, db.UpdateLocationPermissionParams{
 		UserID:                  userID,
-		EnabledLocationTracking: enabled,
+		EnabledLocationTracking: pgtype.Bool{Bool: enabled, Valid: true},
 	})
 	if err != nil {
 		return false, fmt.Errorf("failed to update location permission: %w", err)
 	}
-	return result, nil
+	return result.Bool, nil
 }
 
 // Helper functions for settings defaults
