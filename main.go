@@ -8,165 +8,176 @@ import (
 	"os/signal"
 	"time"
 
-	appHandlers "citystatAPI/handlers"
-	appMiddleware "citystatAPI/middleware"
-	"citystatAPI/prisma/db"
-	"citystatAPI/services"
+	"citystatAPI/internal/config"
+	"citystatAPI/internal/db"
+	"citystatAPI/internal/handlers"
+	"citystatAPI/internal/middleware"
+	"citystatAPI/internal/repository"
+	"citystatAPI/internal/services"
+
 	"github.com/clerk/clerk-sdk-go/v2"
-	"github.com/go-openapi/runtime/middleware"
-	"github.com/gorilla/handlers"
+	gorillaHandlers "github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
-var (
-	client          *db.PrismaClient
-	userService     *services.UserService
-	settingsService *services.SettingsService
-	friendService   *services.FriendService
-	visitorService  *services.VisitorService
-)
-
-func init() {
+func main() {
+	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
 
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL environment variable is not set")
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal("Failed to load configuration:", err)
 	}
-	log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...")
 
-	clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
+	// Setup logging
+	logger := hclog.Default()
 
-	client = db.NewClient()
-	if err := client.Prisma.Connect(); err != nil {
+	// Initialize Clerk
+	clerk.SetKey(cfg.ClerkSecretKey)
+
+	// Connect to database
+	ctx := context.Background()
+	dbPool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
+	defer dbPool.Close()
 
-	userService = services.NewUserService(client)
-	settingsService = services.NewSettingsService(client)
-	friendService = services.NewFriendService(client)
-	visitorService = services.NewVisitorService(client)
+	// Test database connection
+	if err := dbPool.Ping(ctx); err != nil {
+		log.Fatal("Failed to ping database:", err)
+	}
 
-}
+	// Initialize database queries
+	queries := db.New(dbPool)
 
-func main() {
-	defer func() {
-		if err := client.Prisma.Disconnect(); err != nil {
-			log.Printf("Failed to disconnect: %v", err)
-		}
-	}()
+	// Initialize repositories
+	repos := &repository.Repositories{
+		User:     repository.NewUserRepository(queries),
+		Friend:   repository.NewFriendRepository(queries),
+		Settings: repository.NewSettingsRepository(queries),
+		Visitor:  repository.NewVisitorRepository(queries),
+	}
 
-	tempLogger := hclog.Default()
+	// Initialize services
+	svc := &services.Services{
+		User:     services.NewUserService(repos.User, repos.Settings),
+		Friend:   services.NewFriendService(repos.Friend, repos.User),
+		Settings: services.NewSettingsService(repos.Settings),
+		Visitor:  services.NewVisitorService(repos.Visitor, repos.Settings),
+	}
 
-	userHandler := appHandlers.NewUserHandler(userService)
-	settingsHandler := appHandlers.NewSettingsHandler(settingsService)
-	visitorHandler := appHandlers.NewVisitorHandler(visitorService)
-	friendHandler := appHandlers.NewFriendHandler(friendService)
-	inviteHandler := appHandlers.NewInviteHandler(userService, friendService)
-	uploadHandler := appHandlers.NewUploadHandler()
-	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
+	// Initialize handlers
+	h := &handlers.Handlers{
+		User:     handlers.NewUserHandler(svc.User),
+		Friend:   handlers.NewFriendHandler(svc.Friend),
+		Settings: handlers.NewSettingsHandler(svc.Settings),
+		Visitor:  handlers.NewVisitorHandler(svc.Visitor),
+		Upload:   handlers.NewUploadHandler(),
+		Webhook:  handlers.NewWebhookHandler(svc.User),
+		Invite:   handlers.NewInviteHandler(svc.User, svc.Friend),
+	}
 
-	r := mux.NewRouter()
+	// Setup routes
+	router := setupRoutes(h)
 
-	// Public invite routes (no auth required for initial processing)
-	r.HandleFunc("/invite", inviteHandler.ProcessInvite).Methods("GET")
-
-	// API subrouter
-	api := r.PathPrefix("/api").Subrouter()
-
-	// Protected routes
-	protected := api.PathPrefix("").Subrouter()
-	protected.Use(appMiddleware.ClerkMiddleware)
-
-	// User routes
-	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
-	protected.HandleFunc("/user/details", userHandler.UpdateUserDetails).Methods("PUT")
-	protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT")
-	protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
-	protected.HandleFunc("/user/note", userHandler.EditNote).Methods("PUT")
-	protected.HandleFunc("/users/search", userHandler.SearchUsers).Methods("GET")
-
-	// Friend routes
-	protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
-	protected.HandleFunc("/friends/add", friendHandler.AddFriend).Methods("POST")
-	protected.HandleFunc("/friends/list", friendHandler.GetFriends).Methods("GET")
-	protected.HandleFunc("/friends/{friendId}", friendHandler.RemoveFriend).Methods("DELETE")
-
-	// Invite routes
-	protected.HandleFunc("/invite/accept", inviteHandler.AcceptInvite).Methods("POST")
-	protected.HandleFunc("/invite/link", inviteHandler.GetInviteLink).Methods("GET")
-
-	// Settings routes
-	protected.HandleFunc("/settings", settingsHandler.GetUserSettings).Methods("GET")
-	protected.HandleFunc("/user/settings", userHandler.UpdateUserSettings).Methods("PUT")
-	protected.HandleFunc("/settings/account", userHandler.SearchUsers).Methods("GET")
-	protected.HandleFunc("/settings/username", settingsHandler.EditUsername).Methods("PUT")
-	protected.HandleFunc("/settings/phone", settingsHandler.EditPhoneNumber).Methods("PUT")
-
-	// Visitor routes
-	protected.HandleFunc("/visitor/locationPermission", visitorHandler.GetLocationPermission).Methods("GET")
-	protected.HandleFunc("/visitor/locationPermission", visitorHandler.SaveLocationPermission).Methods("POST")
-		protected.HandleFunc("/visitor/streets", visitorHandler.GetVisitedStreets).Methods("GET")
-	protected.HandleFunc("/visitor/streets", visitorHandler.SaveVisitedStreets).Methods("POST")
-
-	// Add UploadThing routes
-	protected.PathPrefix("/uploadthing").HandlerFunc(uploadHandler.UploadThingProxy)
-	protected.HandleFunc("/upload/complete", uploadHandler.HandleImageUpload).Methods("POST")
-
-	//Clerk routes
-	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")
-	r.HandleFunc("/webhooks", webhookHandler.HandleClerkWebhook).Methods("POST")
-
-	opts := middleware.RedocOpts{SpecURL: "/swagger.yaml"}
-	swaggerHandler := middleware.Redoc(opts, nil)
-
-	r.Handle("/docs", swaggerHandler)
-	//serving a the swagger.yaml file
-	r.Handle("/swagger.yaml", http.FileServer(http.Dir("./")))
-	corsHandler := handlers.CORS(
-		handlers.AllowedOrigins([]string{"*"}), // Configure this for production
-		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
-		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
+	// Setup CORS
+	corsHandler := gorillaHandlers.CORS(
+		gorillaHandlers.AllowedOrigins([]string{"*"}), // Configure for production
+		gorillaHandlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
+		gorillaHandlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
 	)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3333"
-	}
-	port = ":" + port
-
-	server := http.Server{
-		Addr:         port,
-		Handler:      corsHandler(r),                                            // set the default handler
-		ErrorLog:     tempLogger.StandardLogger(&hclog.StandardLoggerOptions{}), // set the logger for the server
-		ReadTimeout:  5 * time.Second,                                           // max time to read request from the client
-		WriteTimeout: 10 * time.Second,                                          // max time to write response to the client
-		IdleTimeout:  120 * time.Second,                                         // max time for connections using TCP Keep-Alive
+	// Create server
+	server := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      corsHandler(router),
+		ErrorLog:     logger.StandardLogger(&hclog.StandardLoggerOptions{}),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
+	// Start server in goroutine
 	go func() {
-		tempLogger.Info("Starting server on port ")
-		tempLogger.Info(port)
-
-		err := server.ListenAndServe()
-		if err != nil {
-			tempLogger.Error("Error starting server", "error", err)
+		logger.Info("Starting server", "port", cfg.Port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("Server failed to start", "error", err)
 			os.Exit(1)
 		}
 	}()
 
-	sigChan := make(chan os.Signal)
-	signal.Notify(sigChan, os.Interrupt)
-	signal.Notify(sigChan, os.Kill)
+	// Wait for interrupt signal to gracefully shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
 
-	sig := <-sigChan
-	log.Println("Got signal:", sig)
+	logger.Info("Shutting down server...")
 
-	timeoutContext, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	// Shutdown server gracefully
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	server.Shutdown(timeoutContext)
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("Server forced to shutdown", "error", err)
+	}
+
+	logger.Info("Server exited")
+}
+
+func setupRoutes(h *handlers.Handlers) *mux.Router {
+	r := mux.NewRouter()
+
+	// Public routes
+	r.HandleFunc("/invite", h.Invite.ProcessInvite).Methods("GET")
+	r.HandleFunc("/webhooks", h.Webhook.HandleClerkWebhook).Methods("POST")
+
+	// API routes
+	api := r.PathPrefix("/api").Subrouter()
+
+	// Protected routes
+	protected := api.PathPrefix("").Subrouter()
+	protected.Use(middleware.ClerkMiddleware)
+
+	// User routes
+	protected.HandleFunc("/user", h.User.GetProfile).Methods("GET")
+	protected.HandleFunc("/user/details", h.User.UpdateUserDetails).Methods("PUT")
+	protected.HandleFunc("/user/profile", h.User.UpdateUserProfile).Methods("PUT")
+	protected.HandleFunc("/user/note", h.User.EditNote).Methods("PUT")
+	protected.HandleFunc("/user/sync", h.User.SyncProfileFromClerk).Methods("POST")
+	protected.HandleFunc("/users/search", h.User.SearchUsers).Methods("GET")
+
+	// Friend routes
+	protected.HandleFunc("/friends/add", h.Friend.AddFriend).Methods("POST")
+	protected.HandleFunc("/friends/list", h.Friend.GetFriends).Methods("GET")
+	protected.HandleFunc("/friends/{friendId}", h.Friend.RemoveFriend).Methods("DELETE")
+
+	// Invite routes
+	protected.HandleFunc("/invite/accept", h.Invite.AcceptInvite).Methods("POST")
+	protected.HandleFunc("/invite/link", h.Invite.GetInviteLink).Methods("GET")
+
+	// Settings routes
+	protected.HandleFunc("/settings", h.Settings.GetUserSettings).Methods("GET")
+	protected.HandleFunc("/settings", h.Settings.UpdateUserSettings).Methods("PUT")
+	protected.HandleFunc("/settings/username", h.Settings.EditUsername).Methods("PUT")
+	protected.HandleFunc("/settings/phone", h.Settings.EditPhoneNumber).Methods("PUT")
+
+	// Visitor routes
+	protected.HandleFunc("/visitor/locationPermission", h.Visitor.GetLocationPermission).Methods("GET")
+	protected.HandleFunc("/visitor/locationPermission", h.Visitor.SaveLocationPermission).Methods("POST")
+	protected.HandleFunc("/visitor/streets", h.Visitor.GetVisitedStreets).Methods("GET")
+	protected.HandleFunc("/visitor/streets", h.Visitor.SaveVisitedStreets).Methods("POST")
+
+	// Upload routes
+	protected.PathPrefix("/uploadthing").HandlerFunc(h.Upload.UploadThingProxy)
+	protected.HandleFunc("/upload/complete", h.Upload.HandleImageUpload).Methods("POST")
+
+	return r
 }
