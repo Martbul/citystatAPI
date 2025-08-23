@@ -60,7 +60,24 @@ var req types.SaveLocationPermitionRequest
 	response := types.SaveLocationPermitionResponse{
 		Success: hasLocationPermission,
 	}
-	middleware.JSONResponse(w, response, http.StatusOK)}
+	middleware.JSONResponse(w, response, http.StatusOK)
+}
+
+func (h *VisitorHandler) GetVisitedStreets(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		middleware.ErrorResponse(w, "User ID not found", http.StatusUnauthorized)
+		return
+	}
+
+	streets, err := h.visitorService.GetVisitedStreets(r.Context(), userID)
+	if err != nil {
+		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	middleware.JSONResponse(w, streets, http.StatusOK)
+}
 
 
 
