@@ -151,21 +151,21 @@ func (s *VisitorService) GetVisitedStreets(ctx context.Context, clerkUserID stri
 // 	return nil
 // }
 
-
 func (s *VisitorService) SaveVisitedStreets(ctx context.Context, clerkUserID string, req types.SaveVisitedStreetsRequest) error {
 	seen := make(map[string]struct{})
 	for _, street := range req.VisitedStreets {
-		// Skip if this StreetID has already been processed in this request
-		if _, exists := seen[street.StreetID]; exists {
+		// Create a unique key based on StreetID and StreetName to avoid duplicates in this batch
+		key := street.StreetID + "|" + street.StreetName
+		if _, exists := seen[key]; exists {
 			continue
 		}
-		seen[street.StreetID] = struct{}{}
+		seen[key] = struct{}{}
 
 		entryTimestamp := prismaTypes.BigInt(street.EntryTimestamp)
 		entryLatitude := decimal.NewFromFloat(street.EntryLatitude)
 		entryLongitude := decimal.NewFromFloat(street.EntryLongitude)
 
-		// Check if the record already exists to avoid duplicates
+		// Check if the record already exists to avoid duplicates in the database
 		existing, err := s.client.VisitedStreet.FindFirst(
 			db.VisitedStreet.UserID.Equals(clerkUserID),
 			db.VisitedStreet.SessionID.Equals(req.SessionID),
@@ -180,7 +180,6 @@ func (s *VisitorService) SaveVisitedStreets(ctx context.Context, clerkUserID str
 
 		// If record doesn't exist, create it
 		if existing == nil {
-			// Prepare optional parameters
 			var optionalParams []db.VisitedStreetSetParam
 
 			if street.ExitTimestamp != nil {
@@ -192,7 +191,6 @@ func (s *VisitorService) SaveVisitedStreets(ctx context.Context, clerkUserID str
 				optionalParams = append(optionalParams, db.VisitedStreet.DurationSeconds.Set(*street.DurationSeconds))
 			}
 
-			// Create the record - use User.Link for the relation
 			_, err = s.client.VisitedStreet.CreateOne(
 				db.VisitedStreet.SessionID.Set(req.SessionID),
 				db.VisitedStreet.StreetID.Set(street.StreetID),
