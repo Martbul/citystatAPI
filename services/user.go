@@ -507,9 +507,7 @@ func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string
 	).With(
 		db.User.Settings.Fetch(),
 		db.User.Friends.Fetch(),
-		db.User.CityStats.Fetch().With(
-			db.CityStat.StreetWalks.Fetch(),
-		),
+		
 	).Exec(ctx)
 
 	if err != nil {
