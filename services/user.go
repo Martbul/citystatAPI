@@ -17,66 +17,201 @@ type UserService struct {
 func NewUserService(client *db.PrismaClient) *UserService {
 	return &UserService{client: client}
 }
-
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
-	fmt.Println("updating user")
-
-	fmt.Println(updates)
-	// Ensure user exists first
-	existingUser, err := s.client.User.FindUnique(
-		db.User.ID.Equals(clerkUserID),
-	).With(
-		db.User.Settings.Fetch(),
-	).Exec(ctx)
-
-	if err != nil {
-		if err == db.ErrNotFound {
-			// User doesn't exist, sync from Clerk first
-			user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
-			if syncErr != nil {
-				return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
-			}
-			existingUser = user
-		} else {
-			return nil, fmt.Errorf("error checking existing user: %w", err)
-		}
-	}
-
-	// Build update operations based on provided fields
-	updateOps := []db.UserSetParam{}
-
-	if updates.FirstName != nil {
-		updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
-	}
-	if updates.LastName != nil {
-		updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
-	}
-	if updates.UserName != nil {
-		updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
-	}
-	if updates.ImageURL != nil {
-		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
-	}
-	if updates.CompletedTutorial != nil {
-		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
-	}
-
-	// If no updates provided, return existing user
-	if len(updateOps) == 0 {
-		return existingUser, nil
-	}
-
-	// Perform the update
-	updatedUser, err := s.client.User.FindUnique(
-		db.User.ID.Equals(clerkUserID),
-	).Update(updateOps...).Exec(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to update user: %w", err)
-	}
-
-	return updatedUser, nil
+    fmt.Println("updating user")
+    fmt.Println(updates)
+    
+    // Ensure user exists first
+    existingUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).With(
+        db.User.Settings.Fetch(),
+    ).Exec(ctx)
+    if err != nil {
+        if err == db.ErrNotFound {
+            // User doesn't exist, sync from Clerk first
+            user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
+            if syncErr != nil {
+                return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
+            }
+            existingUser = user
+        } else {
+            return nil, fmt.Errorf("error checking existing user: %w", err)
+        }
+    }
+    
+    // Build update operations based on provided fields
+    updateOps := []db.UserSetParam{}
+    
+    if updates.FirstName != nil {
+        updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
+    }
+    if updates.LastName != nil {
+        updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
+    }
+    if updates.UserName != nil {
+        updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
+    }
+    if updates.ImageURL != nil {
+        updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
+    }
+    if updates.CompletedTutorial != nil {
+        updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
+    }
+    
+    // Handle city data - Option 1: Using SelectedCity object
+    if updates.SelectedCity != nil {
+        city := updates.SelectedCity
+        updateOps = append(updateOps, db.User.CityName.Set(city.Name))
+        updateOps = append(updateOps, db.User.CityCountry.Set(city.Country))
+        updateOps = append(updateOps, db.User.CityLat.Set(city.Lat))
+        updateOps = append(updateOps, db.User.CityLng.Set(city.Lon))
+        updateOps = append(updateOps, db.User.CityDisplayName.Set(city.DisplayName))
+        
+        // Update the legacy city field for backward compatibility
+        updateOps = append(updateOps, db.User.City.Set(city.Name))
+        
+        // Handle optional state
+        if city.State != nil {
+            updateOps = append(updateOps, db.User.CityState.Set(*city.State))
+        }
+    }
+    
+    // Handle city data - Option 2: Using individual fields (alternative approach)
+    if updates.CityName != nil {
+        updateOps = append(updateOps, db.User.CityName.Set(*updates.CityName))
+        // Update legacy city field for backward compatibility
+        updateOps = append(updateOps, db.User.City.Set(*updates.CityName))
+    }
+    if updates.CityCountry != nil {
+        updateOps = append(updateOps, db.User.CityCountry.Set(*updates.CityCountry))
+    }
+    if updates.CityState != nil {
+        updateOps = append(updateOps, db.User.CityState.Set(*updates.CityState))
+    }
+    if updates.CityCoords != nil {
+        updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
+        updateOps = append(updateOps, db.User.CityLng.Set(updates.CityCoords.Lng))
+    }
+    
+    // If no updates provided, return existing user
+    if len(updateOps) == 0 {
+        return existingUser, nil
+    }
+    
+    // Perform the update
+    updatedUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).Update(updateOps...).Exec(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("failed to update user: %w", err)
+    }
+    
+    // If this is the first time setting city data, initialize CityStat
+    if updates.SelectedCity != nil || updates.CityName != nil {
+        // Get the city name from the updated user
+        cityName, hasCityName := updatedUser.CityName()
+        if hasCityName {
+            err = s.initializeCityStatsIfNeeded(ctx, clerkUserID, &cityName)
+            if err != nil {
+                // Log error but don't fail the user update
+                fmt.Printf("Warning: failed to initialize city stats for user %s: %v\n", clerkUserID, err)
+            }
+        }
+    }
+    
+    return updatedUser, nil
 }
+
+// Helper method to initialize CityStat if it doesn't exist
+func (s *UserService) initializeCityStatsIfNeeded(ctx context.Context, userID string, cityName *string) error {
+    if cityName == nil {
+        return nil
+    }
+    
+    // Check if CityStat already exists
+    _, err := s.client.CityStat.FindUnique(
+        db.CityStat.UserID.Equals(userID),
+    ).Exec(ctx)
+    
+    if err == db.ErrNotFound {
+        // Create new CityStat with proper relation setup
+        _, err = s.client.CityStat.CreateOne(
+            db.CityStat.City.Set(*cityName),
+            db.CityStat.User.Link(
+                db.User.ID.Equals(userID),
+            ),
+        ).Exec(ctx)
+        if err != nil {
+            return fmt.Errorf("failed to create city stats: %w", err)
+        }
+    } else if err != nil {
+        return fmt.Errorf("failed to check existing city stats: %w", err)
+    }
+    
+    return nil
+}
+// func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
+// 	fmt.Println("updating user")
+
+// 	fmt.Println(updates)
+// 	// Ensure user exists first
+// 	existingUser, err := s.client.User.FindUnique(
+// 		db.User.ID.Equals(clerkUserID),
+// 	).With(
+// 		db.User.Settings.Fetch(),
+// 	).Exec(ctx)
+
+// 	if err != nil {
+// 		if err == db.ErrNotFound {
+// 			// User doesn't exist, sync from Clerk first
+// 			user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
+// 			if syncErr != nil {
+// 				return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
+// 			}
+// 			existingUser = user
+// 		} else {
+// 			return nil, fmt.Errorf("error checking existing user: %w", err)
+// 		}
+// 	}
+
+// 	// Build update operations based on provided fields
+// 	updateOps := []db.UserSetParam{}
+
+// 	if updates.FirstName != nil {
+// 		updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
+// 	}
+// 	if updates.LastName != nil {
+// 		updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
+// 	}
+// 	if updates.UserName != nil {
+// 		updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
+// 	}
+// 	if updates.ImageURL != nil {
+// 		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
+// 	}
+// 	if updates.CompletedTutorial != nil {
+// 		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
+// 	}
+
+// 	// If no updates provided, return existing user
+// 	if len(updateOps) == 0 {
+// 		return existingUser, nil
+// 	}
+
+// 	// Perform the update
+// 	updatedUser, err := s.client.User.FindUnique(
+// 		db.User.ID.Equals(clerkUserID),
+// 	).Update(updateOps...).Exec(ctx)
+
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to update user: %w", err)
+// 	}
+
+// 	return updatedUser, nil
+// }
+
+
 func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
 	fmt.Printf("[SyncUserFromClerk] Starting sync for Clerk user ID: %s\n", clerkUserID)
 
