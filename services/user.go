@@ -17,6 +17,8 @@ type UserService struct {
 func NewUserService(client *db.PrismaClient) *UserService {
 	return &UserService{client: client}
 }
+
+
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
     fmt.Println("updating user")
     fmt.Println(updates)
@@ -43,6 +45,7 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
     // Build update operations based on provided fields
     updateOps := []db.UserSetParam{}
     
+    // Handle basic user fields
     if updates.FirstName != nil {
         updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
     }
@@ -59,8 +62,11 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
         updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
     }
     
-    // Handle city data - Option 1: Using SelectedCity object
+    // Handle city data - ONLY use SelectedCity OR individual fields, not both
+    var cityNameForStats *string
+    
     if updates.SelectedCity != nil {
+        // Use SelectedCity object (preferred approach for frontend)
         city := updates.SelectedCity
         updateOps = append(updateOps, db.User.CityName.Set(city.Name))
         updateOps = append(updateOps, db.User.CityCountry.Set(city.Country))
@@ -75,23 +81,29 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
         if city.State != nil {
             updateOps = append(updateOps, db.User.CityState.Set(*city.State))
         }
-    }
-    
-    // Handle city data - Option 2: Using individual fields (alternative approach)
-    if updates.CityName != nil {
-        updateOps = append(updateOps, db.User.CityName.Set(*updates.CityName))
-        // Update legacy city field for backward compatibility
-        updateOps = append(updateOps, db.User.City.Set(*updates.CityName))
-    }
-    if updates.CityCountry != nil {
-        updateOps = append(updateOps, db.User.CityCountry.Set(*updates.CityCountry))
-    }
-    if updates.CityState != nil {
-        updateOps = append(updateOps, db.User.CityState.Set(*updates.CityState))
-    }
-    if updates.CityCoords != nil {
-        updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
-        updateOps = append(updateOps, db.User.CityLng.Set(updates.CityCoords.Lng))
+        
+        cityNameForStats = &city.Name
+        
+    } else {
+        // Use individual fields (fallback approach)
+        // Only process individual fields if SelectedCity is NOT provided
+        
+        if updates.CityName != nil {
+            updateOps = append(updateOps, db.User.CityName.Set(*updates.CityName))
+            // Update legacy city field for backward compatibility
+            updateOps = append(updateOps, db.User.City.Set(*updates.CityName))
+            cityNameForStats = updates.CityName
+        }
+        if updates.CityCountry != nil {
+            updateOps = append(updateOps, db.User.CityCountry.Set(*updates.CityCountry))
+        }
+        if updates.CityState != nil {
+            updateOps = append(updateOps, db.User.CityState.Set(*updates.CityState))
+        }
+        if updates.CityCoords != nil {
+            updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
+            updateOps = append(updateOps, db.User.CityLng.Set(updates.CityCoords.Lng))
+        }
     }
     
     // If no updates provided, return existing user
@@ -108,20 +120,17 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
     }
     
     // If this is the first time setting city data, initialize CityStat
-    if updates.SelectedCity != nil || updates.CityName != nil {
-        // Get the city name from the updated user
-        cityName, hasCityName := updatedUser.CityName()
-        if hasCityName {
-            err = s.initializeCityStatsIfNeeded(ctx, clerkUserID, &cityName)
-            if err != nil {
-                // Log error but don't fail the user update
-                fmt.Printf("Warning: failed to initialize city stats for user %s: %v\n", clerkUserID, err)
-            }
+    if cityNameForStats != nil {
+        err = s.initializeCityStatsIfNeeded(ctx, clerkUserID, cityNameForStats)
+        if err != nil {
+            // Log error but don't fail the user update
+            fmt.Printf("Warning: failed to initialize city stats for user %s: %v\n", clerkUserID, err)
         }
     }
     
     return updatedUser, nil
 }
+
 
 // Helper method to initialize CityStat if it doesn't exist
 func (s *UserService) initializeCityStatsIfNeeded(ctx context.Context, userID string, cityName *string) error {
