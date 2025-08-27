@@ -748,3 +748,86 @@ func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username s
 
 	return results, nil
 }
+
+
+
+func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) ([]types.UserSearchResult, error) {
+	// Fetch current user to get their city
+	currentUser, err := s.client.User.FindUnique(
+		db.User.ID.Equals(clerkUserID),
+	).Exec(ctx)
+	if err != nil {
+		if err == db.ErrNotFound {
+			return nil, fmt.Errorf("current user not found")
+		}
+		return nil, fmt.Errorf("failed to fetch current user: %w", err)
+	}
+
+	cityName, hasCity := currentUser.CityName()
+	if !hasCity || cityName == "" {
+		return nil, fmt.Errorf("current user has no city set")
+	}
+
+
+//2. Fetch current user's friends (both directions)
+	friendships, err := s.client.Friend.FindMany(
+		db.Friend.UserID.Equals(clerkUserID),
+	).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch friends: %w", err)
+	}
+
+	friendOf, err := s.client.Friend.FindMany(
+		db.Friend.FriendID.Equals(clerkUserID),
+	).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch reverse friends: %w", err)
+	}
+
+	// collect all friend IDs
+	friendIDs := make(map[string]struct{})
+	for _, f := range friendships {
+		friendIDs[f.FriendID] = struct{}{}
+	}
+	for _, f := range friendOf {
+		friendIDs[f.UserID] = struct{}{}
+	}
+
+	
+
+	// convert to slice for query
+	excludedIDs := make([]string, 0, len(friendIDs))
+	for id := range friendIDs {
+		excludedIDs = append(excludedIDs, id)
+	}
+
+	
+
+	usersInCity, err := s.client.User.FindMany(
+		db.User.And(
+			db.User.CityName.Equals(cityName),
+			db.User.ID.NotIn(excludedIDs),
+		),
+	).Take(20).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch users in same city: %w", err)
+	}
+	// Convert to response format
+	results := make([]types.UserSearchResult, len(usersInCity))
+	for i, user := range usersInCity {
+		firstName, _ := user.FirstName()
+		lastName, _ := user.LastName()
+		userName, _ := user.UserName()
+		imageURL:= user.ImageURL
+		results[i] = types.UserSearchResult{
+			ID:        user.ID,
+			UserName:  &userName,
+			FirstName: &firstName,
+			LastName:  &lastName,
+			ImageURL:  &imageURL,
+			IsFriend:  false, 
+		}
+	}
+
+	return results, nil
+}

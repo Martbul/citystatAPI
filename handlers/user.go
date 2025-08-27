@@ -37,6 +37,8 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	middleware.JSONResponse(w, user, http.StatusOK)
 }
 
+
+//! after user selects its city calculate its street count, its street area, 
 func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
@@ -234,6 +236,25 @@ func (h *UserHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	users, err := h.userService.SearchUsers(r.Context(), userID, username)
+	if err != nil {
+		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := types.SearchUsersResponse{Users: users}
+	middleware.JSONResponse(w, response, http.StatusOK)
+}
+
+
+
+func (h *UserHandler) GetUsersSameCity(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+	users, err := h.userService.GetUsersSameCity(r.Context(), userID)
 	if err != nil {
 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
