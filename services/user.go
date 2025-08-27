@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"citystatAPI/prisma/db"
 	"citystatAPI/types"
@@ -751,83 +752,145 @@ func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username s
 
 
 
+
+// Fixed Service with better error handling and edge case management
 func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) ([]types.UserSearchResult, error) {
-	// Fetch current user to get their city
+	fmt.Printf("Getting users in same city for: %s\n", clerkUserID)
+	
+	// Add context timeout to prevent hanging requests
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// 1. Fetch current user to get their city
 	currentUser, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
 	).Exec(ctx)
 	if err != nil {
 		if err == db.ErrNotFound {
+			fmt.Printf("Current user not found: %s\n", clerkUserID)
 			return nil, fmt.Errorf("current user not found")
 		}
+		fmt.Printf("Database error fetching current user: %v\n", err)
 		return nil, fmt.Errorf("failed to fetch current user: %w", err)
 	}
 
 	cityName, hasCity := currentUser.CityName()
 	if !hasCity || cityName == "" {
+		fmt.Printf("User %s has no city set\n", clerkUserID)
 		return nil, fmt.Errorf("current user has no city set")
 	}
 
+	fmt.Printf("Searching for users in city: %s\n", cityName)
 
-//2. Fetch current user's friends (both directions)
+	// 2. Fetch current user's friends (both directions) - with error handling
+	friendIDs := make(map[string]struct{})
+	
+	// Add current user to excluded IDs to avoid returning themselves
+	friendIDs[clerkUserID] = struct{}{}
+
+	// Fetch outgoing friendships
 	friendships, err := s.client.Friend.FindMany(
 		db.Friend.UserID.Equals(clerkUserID),
 	).Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch friends: %w", err)
+		fmt.Printf("Warning: failed to fetch outgoing friendships: %v\n", err)
+		// Don't return error here - continue without friend filtering
+	} else {
+		for _, f := range friendships {
+			friendIDs[f.FriendID] = struct{}{}
+		}
 	}
 
+	// Fetch incoming friendships
 	friendOf, err := s.client.Friend.FindMany(
 		db.Friend.FriendID.Equals(clerkUserID),
 	).Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch reverse friends: %w", err)
+		fmt.Printf("Warning: failed to fetch incoming friendships: %v\n", err)
+		// Don't return error here - continue without friend filtering
+	} else {
+		for _, f := range friendOf {
+			friendIDs[f.UserID] = struct{}{}
+		}
 	}
 
-	// collect all friend IDs
-	friendIDs := make(map[string]struct{})
-	for _, f := range friendships {
-		friendIDs[f.FriendID] = struct{}{}
-	}
-	for _, f := range friendOf {
-		friendIDs[f.UserID] = struct{}{}
-	}
-
-	
-
-	// convert to slice for query
+	// Convert to slice for query
 	excludedIDs := make([]string, 0, len(friendIDs))
 	for id := range friendIDs {
 		excludedIDs = append(excludedIDs, id)
 	}
 
-	
+	fmt.Printf("Excluding %d user IDs from results\n", len(excludedIDs))
 
-	usersInCity, err := s.client.User.FindMany(
-		db.User.And(
-			db.User.CityName.Equals(cityName),
-			db.User.ID.NotIn(excludedIDs),
-		),
-	).Take(20).Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch users in same city: %w", err)
+	// 3. Fetch users in same city - with better query structure
+	var usersInCity []db.UserModel
+	var queryErr error
+
+	if len(excludedIDs) > 0 {
+		// Query with exclusions
+		usersInCity, queryErr = s.client.User.FindMany(
+			db.User.And(
+				db.User.CityName.Equals(cityName),
+				db.User.ID.NotIn(excludedIDs),
+			),
+		).Take(20).Exec(ctx)
+	} else {
+		// Query without exclusions (fallback)
+		usersInCity, queryErr = s.client.User.FindMany(
+			db.User.And(
+				db.User.CityName.Equals(cityName),
+				db.User.ID.Not(clerkUserID), // Just exclude current user
+			),
+		).Take(20).Exec(ctx)
 	}
-	// Convert to response format
+
+	if queryErr != nil {
+		fmt.Printf("Database error fetching users in same city: %v\n", queryErr)
+		return nil, fmt.Errorf("failed to fetch users in same city: %w", queryErr)
+	}
+
+	fmt.Printf("Found %d users in city %s\n", len(usersInCity), cityName)
+
+	// 4. Convert to response format with null safety
 	results := make([]types.UserSearchResult, len(usersInCity))
 	for i, user := range usersInCity {
-		firstName, _ := user.FirstName()
-		lastName, _ := user.LastName()
-		userName, _ := user.UserName()
-		imageURL:= user.ImageURL
+		// Handle optional fields safely
+		var firstName, lastName, userName string
+		var imageURL string
+
+		if fn, hasFN := user.FirstName(); hasFN {
+			firstName = fn
+		}
+		if ln, hasLN := user.LastName(); hasLN {
+			lastName = ln
+		}
+		if un, hasUN := user.UserName(); hasUN {
+			userName = un
+		}
+		// if user.ImageURL != nil {
+		// 	imageURL = *&user.ImageURL
+		// }
+
 		results[i] = types.UserSearchResult{
 			ID:        user.ID,
 			UserName:  &userName,
 			FirstName: &firstName,
 			LastName:  &lastName,
 			ImageURL:  &imageURL,
-			IsFriend:  false, 
+			IsFriend:  false,
 		}
 	}
 
 	return results, nil
+}
+
+
+// Add this health check method to your UserService
+func (s *UserService) HealthCheck(ctx context.Context) error {
+	// Simple query to check database connection
+	_, err := s.client.User.FindFirst().Exec(ctx)
+	if err != nil && err != db.ErrNotFound {
+		return err
+	}
+	return nil
 }

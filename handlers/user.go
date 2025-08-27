@@ -246,20 +246,60 @@ func (h *UserHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 
-
 func (h *UserHandler) GetUsersSameCity(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
+		fmt.Printf("Error: User ID not found in context\n")
 		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
 		return
 	}
 
+	fmt.Printf("Fetching users in same city for user: %s\n", userID)
+
 	users, err := h.userService.GetUsersSameCity(r.Context(), userID)
 	if err != nil {
-		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		fmt.Printf("Error in GetUsersSameCity: %v\n", err)
+		// Don't return 500 for business logic errors - return appropriate status codes
+		if err.Error() == "current user not found" {
+			middleware.ErrorResponse(w, "User not found", http.StatusNotFound)
+			return
+		}
+		if err.Error() == "current user has no city set" {
+			middleware.ErrorResponse(w, "User location not set", http.StatusBadRequest)
+			return
+		}
+		middleware.ErrorResponse(w, "Failed to fetch suggested users", http.StatusInternalServerError)
 		return
 	}
 
 	response := types.SearchUsersResponse{Users: users}
 	middleware.JSONResponse(w, response, http.StatusOK)
+}
+
+
+// Additional debugging middleware you can add
+func (h *UserHandler) DebugGetUsersSameCity(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("=== Debug GetUsersSameCity Request ===\n")
+	fmt.Printf("Method: %s\n", r.Method)
+	fmt.Printf("URL: %s\n", r.URL.String())
+	fmt.Printf("Headers: %v\n", r.Header)
+	
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		fmt.Printf("ERROR: No user ID in context\n")
+		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+	
+	fmt.Printf("User ID from context: %s\n", userID)
+	
+	// Check database connection
+	if err := h.userService.HealthCheck(r.Context()); err != nil {
+		fmt.Printf("ERROR: Database health check failed: %v\n", err)
+		middleware.ErrorResponse(w, "Database unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	
+	// Proceed with normal flow
+	h.GetUsersSameCity(w, r)
 }

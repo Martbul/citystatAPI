@@ -89,7 +89,7 @@ func main() {
 	protected.HandleFunc("/user/profile", userHandler.EditProfile).Methods("PUT")
 	protected.HandleFunc("/user/note", userHandler.EditNote).Methods("PUT")
 	protected.HandleFunc("/users/search", userHandler.SearchUsers).Methods("GET")
-		protected.HandleFunc("/users/sameCity", userHandler.GetUsersSameCity).Methods("GET")
+	protected.HandleFunc("/users/sameCity", userHandler.GetUsersSameCity).Methods("GET")
 
 
 	// Friend routes
