@@ -161,65 +161,6 @@ func (s *UserService) initializeCityStatsIfNeeded(ctx context.Context, userID st
     
     return nil
 }
-// func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
-// 	fmt.Println("updating user")
-
-// 	fmt.Println(updates)
-// 	// Ensure user exists first
-// 	existingUser, err := s.client.User.FindUnique(
-// 		db.User.ID.Equals(clerkUserID),
-// 	).With(
-// 		db.User.Settings.Fetch(),
-// 	).Exec(ctx)
-
-// 	if err != nil {
-// 		if err == db.ErrNotFound {
-// 			// User doesn't exist, sync from Clerk first
-// 			user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
-// 			if syncErr != nil {
-// 				return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
-// 			}
-// 			existingUser = user
-// 		} else {
-// 			return nil, fmt.Errorf("error checking existing user: %w", err)
-// 		}
-// 	}
-
-// 	// Build update operations based on provided fields
-// 	updateOps := []db.UserSetParam{}
-
-// 	if updates.FirstName != nil {
-// 		updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
-// 	}
-// 	if updates.LastName != nil {
-// 		updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
-// 	}
-// 	if updates.UserName != nil {
-// 		updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
-// 	}
-// 	if updates.ImageURL != nil {
-// 		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
-// 	}
-// 	if updates.CompletedTutorial != nil {
-// 		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
-// 	}
-
-// 	// If no updates provided, return existing user
-// 	if len(updateOps) == 0 {
-// 		return existingUser, nil
-// 	}
-
-// 	// Perform the update
-// 	updatedUser, err := s.client.User.FindUnique(
-// 		db.User.ID.Equals(clerkUserID),
-// 	).Update(updateOps...).Exec(ctx)
-
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to update user: %w", err)
-// 	}
-
-// 	return updatedUser, nil
-// }
 
 
 func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string) (*db.UserModel, error) {

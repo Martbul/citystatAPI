@@ -94,12 +94,11 @@ func (h *VisitorHandler) SaveVisitedStreets(w http.ResponseWriter, r *http.Reque
         return
     }
 
-    
-    err := h.visitorService.SaveVisitedStreets(r.Context(), userID, req)
-    if err != nil {
-        middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
+  response, err := h.visitorService.SaveVisitedStreets(r.Context(), userID, req)
+	if err != nil {
+		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-    middleware.JSONResponse(w, map[string]string{"status": "success"}, http.StatusOK)
+	middleware.JSONResponse(w, response, http.StatusOK)
 }

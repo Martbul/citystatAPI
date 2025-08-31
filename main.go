@@ -26,6 +26,7 @@ var (
 	settingsService *services.SettingsService
 	friendService   *services.FriendService
 	visitorService  *services.VisitorService
+	rankService     *services.RankService
 )
 
 func init() {
@@ -49,7 +50,8 @@ func init() {
 	userService = services.NewUserService(client)
 	settingsService = services.NewSettingsService(client)
 	friendService = services.NewFriendService(client)
-	visitorService = services.NewVisitorService(client)
+	rankService = services.NewRankService(client)
+	visitorService = services.NewVisitorService(client, rankService)
 
 }
 
@@ -69,6 +71,7 @@ func main() {
 	inviteHandler := appHandlers.NewInviteHandler(userService, friendService)
 	uploadHandler := appHandlers.NewUploadHandler()
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
+	rankHandler := appHandlers.NewRankHandler(rankService) // New rank handler
 
 	r := mux.NewRouter()
 
@@ -91,7 +94,6 @@ func main() {
 	protected.HandleFunc("/users/search", userHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/users/sameCity", userHandler.GetUsersSameCity).Methods("GET")
 
-
 	// Friend routes
 	protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
 	protected.HandleFunc("/friends/add", friendHandler.AddFriend).Methods("POST")
@@ -112,9 +114,13 @@ func main() {
 	// Visitor routes
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.GetLocationPermission).Methods("GET")
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.SaveLocationPermission).Methods("POST")
-		protected.HandleFunc("/visitor/streets", visitorHandler.GetVisitedStreets).Methods("GET")
-
+	protected.HandleFunc("/visitor/streets", visitorHandler.GetVisitedStreets).Methods("GET")
 	protected.HandleFunc("/visitor/streets", visitorHandler.SaveVisitedStreets).Methods("POST")
+
+	// Rank routes
+	protected.HandleFunc("/rank", rankHandler.GetUserRank).Methods("GET")
+	protected.HandleFunc("/rank/progress", rankHandler.GetLevelProgress).Methods("GET")
+	protected.HandleFunc("/rank/leaderboard", rankHandler.GetLeaderboard).Methods("GET")
 
 	// Add UploadThing routes
 	protected.PathPrefix("/uploadthing").HandlerFunc(uploadHandler.UploadThingProxy)
@@ -124,11 +130,10 @@ func main() {
 	protected.HandleFunc("/user/sync", userHandler.SyncProfileFromClerk).Methods("POST")
 	r.HandleFunc("/webhooks", webhookHandler.HandleClerkWebhook).Methods("POST")
 
+	// Documentation routes
 	opts := middleware.RedocOpts{SpecURL: "/swagger.yaml"}
 	swaggerHandler := middleware.Redoc(opts, nil)
-
 	r.Handle("/docs", swaggerHandler)
-	//serving a the swagger.yaml file
 	r.Handle("/swagger.yaml", http.FileServer(http.Dir("./")))
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Configure this for production
