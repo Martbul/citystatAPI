@@ -297,11 +297,7 @@ func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) 
 }
 
 
-//TODO: Create method for ensuring user has citystat, walked_streets, and so on models
-
-// GetOrCreateUser ensures user exists in database
 func (s *UserService) GetOrCreateUser(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
-	// Try to get user from database first
 	user, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
 	).With(
@@ -313,7 +309,6 @@ func (s *UserService) GetOrCreateUser(ctx context.Context, clerkUserID string) (
 	}
 
 	if err == db.ErrNotFound {
-		// User not in database, sync from Clerk
 		return s.SyncUserFromClerk(ctx, clerkUserID)
 	}
 
@@ -339,7 +334,6 @@ func (s *UserService) EditNote(ctx context.Context, clerkUserID string, updates 
 	return updatedUser, nil
 }
 
-// Add this method to your services/user.go file
 
 func (s *UserService) UpdateUserImage(ctx context.Context, clerkUserID string, imageURL string) (*db.UserModel, error) {
 	updatedUser, err := s.client.User.FindUnique(
