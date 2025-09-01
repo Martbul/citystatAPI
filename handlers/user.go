@@ -12,6 +12,7 @@ import (
 	"citystatAPI/utils"
 )
 
+// UserHandler handles user-related routes
 type UserHandler struct {
 	userService *services.UserService
 }
@@ -21,6 +22,17 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
+
+
+// GetProfile godoc
+// @Summary      Get user profile
+// @Description  Returns the current user's profile
+// @Tags         user
+// @Produce      json
+// @Success      200  {object}  db.UserModel
+// @Failure      401  {object}  map[string]string
+// @Failure      500  {object}  map[string]string
+// @Router       /user [get]
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {
@@ -39,6 +51,18 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 
 //! after user selects its city calculate its street count, its street area, 
+// UpdateUserDetails godoc
+// @Summary      Update user details
+// @Description  Updates profile fields like name, username, and selected city
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Param        request  body      types.UserUpdateRequest  true  "User update payload"
+// @Success      200      {object}  db.UserModel
+// @Failure      400      {object}  map[string]string
+// @Failure      401      {object}  map[string]string
+// @Failure      500      {object}  map[string]string
+// @Router       /user/details [put]
 func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r)
 	if !ok {

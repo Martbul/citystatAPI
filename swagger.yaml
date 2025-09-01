@@ -1,0 +1,13 @@
+openapi: 3.0.0
+info:
+  title: CityStat API
+  version: 1.0.0
+servers:
+  - url: https://citystatapi.onrender.com/api
+paths:
+  /user:
+    get:
+      summary: Get user profile
+      responses:
+        '200':
+          description: OK

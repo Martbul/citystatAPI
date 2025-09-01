@@ -16,13 +16,14 @@ type RankService struct {
 func NewRankService(client *db.PrismaClient) *RankService {
 	return &RankService{client: client}
 }
+
 // GetUserRank retrieves or creates a user's rank
 func (s *RankService) GetUserRank(ctx context.Context, userID string) (*db.RankModel, error) {
 	// Try to get existing rank
 	rank, err := s.client.Rank.FindUnique(
 		db.Rank.UserID.Equals(userID),
 	).Exec(ctx)
-	
+
 	if err == db.ErrNotFound {
 		// Create new rank with default values
 		rank, err = s.client.Rank.CreateOne(
@@ -36,10 +37,9 @@ func (s *RankService) GetUserRank(ctx context.Context, userID string) (*db.RankM
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to get rank: %w", err)
 	}
-	
+
 	return rank, nil
 }
-
 
 // AddPointsForVisitedStreet adds 10 points for each visited street and updates rank
 func (s *RankService) AddPointsForVisitedStreet(ctx context.Context, userID string, streetsCount int) (*db.RankModel, error) {
@@ -48,14 +48,14 @@ func (s *RankService) AddPointsForVisitedStreet(ctx context.Context, userID stri
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Calculate points to add (10 points per street)
 	pointsToAdd := streetsCount * 10
 	newPoints := rank.Points + pointsToAdd
-	
+
 	// Calculate new level based on exponential progression
 	newLevel := s.calculateLevel(newPoints)
-	
+
 	// Update rank in database
 	updatedRank, err := s.client.Rank.FindUnique(
 		db.Rank.UserID.Equals(userID),
@@ -63,11 +63,11 @@ func (s *RankService) AddPointsForVisitedStreet(ctx context.Context, userID stri
 		db.Rank.Points.Set(newPoints),
 		db.Rank.Level.Set(newLevel),
 	).Exec(ctx)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to update rank: %w", err)
 	}
-	
+
 	fmt.Printf("Updated rank for user %s: %d points, level %s\n", userID, newPoints, string(newLevel))
 	return updatedRank, nil
 }
@@ -78,15 +78,15 @@ func (s *RankService) calculateLevel(points int) db.Level {
 	// Define level thresholds with exponential growth
 	// Base: 100 points for Bronze, then multiply by ~2.5 each time
 	levelThresholds := map[db.Level]int{
-		db.LevelIron:     0,     // 0 points
-		db.LevelBronze:   100,   // 100 points
-		db.LevelSilver:   250,   // 250 points (2.5x)
-		db.LevelGold:     625,   // 625 points (2.5x)
-		db.LevelDimond:   1563,  // 1563 points (2.5x)
-		db.LevelPlatinum: 3907,  // 3907 points (2.5x)
-		db.LevelMaster:   9768,  // 9768 points (2.5x)
+		db.LevelIron:     0,    // 0 points
+		db.LevelBronze:   100,  // 100 points
+		db.LevelSilver:   250,  // 250 points (2.5x)
+		db.LevelGold:     625,  // 625 points (2.5x)
+		db.LevelDimond:   1563, // 1563 points (2.5x)
+		db.LevelPlatinum: 3907, // 3907 points (2.5x)
+		db.LevelMaster:   9768, // 9768 points (2.5x)
 	}
-	
+
 	// Determine level based on points
 	if points >= levelThresholds[db.LevelMaster] {
 		return db.LevelMaster
@@ -101,7 +101,7 @@ func (s *RankService) calculateLevel(points int) db.Level {
 	} else if points >= levelThresholds[db.LevelBronze] {
 		return db.LevelBronze
 	}
-	
+
 	return db.LevelIron
 }
 
@@ -111,14 +111,14 @@ func (s *RankService) GetLevelProgress(ctx context.Context, userID string) (*typ
 	if err != nil {
 		return nil, err
 	}
-	
+
 	currentLevel := rank.Level
 	currentPoints := rank.Points
-	
+
 	// Get next level info
 	nextLevel, nextLevelThreshold := s.getNextLevelInfo(currentLevel)
 	currentLevelThreshold := s.getCurrentLevelThreshold(currentLevel)
-	
+
 	// Calculate progress percentage
 	var progressPercentage float64
 	if nextLevel != currentLevel {
@@ -130,15 +130,15 @@ func (s *RankService) GetLevelProgress(ctx context.Context, userID string) (*typ
 	} else {
 		progressPercentage = 100 // Already at max level
 	}
-	
+
 	return &types.LevelProgressInfo{
-		CurrentLevel:         currentLevel,
-		CurrentPoints:        currentPoints,
-		NextLevel:           nextLevel,
-		PointsToNextLevel:   nextLevelThreshold - currentPoints,
-		ProgressPercentage:  progressPercentage,
+		CurrentLevel:          currentLevel,
+		CurrentPoints:         currentPoints,
+		NextLevel:             nextLevel,
+		PointsToNextLevel:     nextLevelThreshold - currentPoints,
+		ProgressPercentage:    progressPercentage,
 		CurrentLevelThreshold: currentLevelThreshold,
-		NextLevelThreshold:   nextLevelThreshold,
+		NextLevelThreshold:    nextLevelThreshold,
 	}, nil
 }
 
@@ -165,7 +165,7 @@ func (s *RankService) getNextLevelInfo(currentLevel db.Level) (db.Level, int) {
 		db.LevelPlatinum,
 		db.LevelMaster,
 	}
-	
+
 	thresholds := map[db.Level]int{
 		db.LevelIron:     0,
 		db.LevelBronze:   100,
@@ -175,14 +175,14 @@ func (s *RankService) getNextLevelInfo(currentLevel db.Level) (db.Level, int) {
 		db.LevelPlatinum: 3907,
 		db.LevelMaster:   9768,
 	}
-	
+
 	for i, level := range levelOrder {
 		if level == currentLevel && i < len(levelOrder)-1 {
 			nextLevel := levelOrder[i+1]
 			return nextLevel, thresholds[nextLevel]
 		}
 	}
-	
+
 	// Already at max level
 	return currentLevel, thresholds[currentLevel]
 }
@@ -192,11 +192,11 @@ func (s *RankService) calculateLevelMathematical(points int) db.Level {
 	if points < 100 {
 		return db.LevelIron
 	}
-	
+
 	// Using exponential formula: threshold = 100 * (2.5^(level-1))
 	// Solve for level: level = log(threshold/100) / log(2.5) + 1
-	level := math.Log(float64(points)/100.0) / math.Log(2.5) + 1
-	
+	level := math.Log(float64(points)/100.0)/math.Log(2.5) + 1
+
 	switch {
 	case level >= 6:
 		return db.LevelMaster
@@ -227,7 +227,7 @@ func (s *RankService) GetLeaderboard(ctx context.Context, limit int, currentUser
 	).OrderBy(
 		db.Rank.Points.Order(db.DESC),
 	).Take(limit).Exec(ctx)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get leaderboard: %w", err)
 	}
@@ -235,16 +235,15 @@ func (s *RankService) GetLeaderboard(ctx context.Context, limit int, currentUser
 	// Convert to leaderboard entries
 	leaderboard := make([]types.LeaderboardEntry, len(topRanks))
 	var currentUserRank *types.LeaderboardEntry
-	
+
 	for i, rank := range topRanks {
 		user := rank.User()
-		
-		
+
 		firstName, _ := user.FirstName()
 		lastName, _ := user.LastName()
 		userName, _ := user.UserName()
 		imageURL := user.ImageURL
-		
+
 		entry := types.LeaderboardEntry{
 			UserID:    user.ID,
 			UserName:  &userName,
@@ -255,15 +254,15 @@ func (s *RankService) GetLeaderboard(ctx context.Context, limit int, currentUser
 			Level:     string(rank.Level),
 			Rank:      i + 1,
 		}
-		
+
 		leaderboard[i] = entry
-		
+
 		// Check if this is the current user
 		if user.ID == currentUserID {
 			currentUserRank = &entry
 		}
 	}
-	
+
 	// If current user is not in top results, find their rank
 	if currentUserRank == nil {
 		currentUserRank, err = s.getCurrentUserRank(ctx, currentUserID)
@@ -271,17 +270,111 @@ func (s *RankService) GetLeaderboard(ctx context.Context, limit int, currentUser
 			fmt.Printf("Warning: failed to get current user rank: %v\n", err)
 		}
 	}
-	
+
 	// Get total number of ranked users
 	totalUsers, err := s.client.Rank.FindMany().Exec(ctx)
 	if err != nil {
 		fmt.Printf("Warning: failed to get total user count: %v\n", err)
 	}
-	
+
 	return &types.LeaderboardData{
 		Leaderboard: leaderboard,
 		CurrentUser: currentUserRank,
 		TotalUsers:  len(totalUsers),
+	}, nil
+}
+
+
+
+//! add this func
+func (s *RankService) GetLocalLeaderboard(ctx context.Context, limit int, currentUserID string) (*types.LeaderboardData, error) {
+	if limit <= 0 {
+		limit = 10 // Default to top 10
+	}
+
+	currUserCity, err := s.client.User.FindUnique(
+		db.User.ID.Equals(currentUserID),
+	).Select(
+		db.User.City.Field(),
+	).Exec(ctx)
+
+	if err != nil {
+		fmt.Printf("Error: failed to get total user city: %v\n", err)
+
+	}
+
+	cityValue, ok := currUserCity.City()
+	if !ok {
+		fmt.Printf("Error: failed to get total user city: %v\n", err)
+
+	}
+
+	// Get top local users by points
+	topLocalRanks, err := s.client.Rank.FindMany(
+		db.Rank.User.Where(
+			db.User.City.Equals(cityValue),
+		),
+	).With(
+		db.Rank.User.Fetch(),
+	).OrderBy(
+		db.Rank.Points.Order(db.DESC),
+	).Take(limit).Exec(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get leaderboard: %w", err)
+	}
+
+	// Convert to leaderboard entries
+	leaderboard := make([]types.LeaderboardEntry, len(topLocalRanks))
+	var currentUserRank *types.LeaderboardEntry
+
+	for i, rank := range topLocalRanks {
+		user := rank.User()
+		firstName, _ := user.FirstName()
+		lastName, _ := user.LastName()
+		userName, _ := user.UserName()
+		imageURL := user.ImageURL
+
+		entry := types.LeaderboardEntry{
+			UserID:    user.ID,
+			UserName:  &userName,
+			FirstName: &firstName,
+			LastName:  &lastName,
+			ImageURL:  &imageURL,
+			Points:    rank.Points,
+			Level:     string(rank.Level),
+			Rank:      i + 1,
+		}
+
+		leaderboard[i] = entry
+
+		// Check if this is the current user
+		if user.ID == currentUserID {
+			currentUserRank = &entry
+		}
+	}
+
+	// If current user is not in top results, find their local rank
+	if currentUserRank == nil {
+		currentUserRank, err = s.getCurrentLocalUserRank(ctx, currentUserID, cityValue)
+		if err != nil {
+			fmt.Printf("Warning: failed to get current user local rank: %v\n", err)
+		}
+	}
+
+	// Get total number of ranked users in the same city
+	totalLocalUsers, err := s.client.Rank.FindMany(
+		db.Rank.User.Where(
+			db.User.City.Equals(cityValue),
+		),
+	).Exec(ctx)
+	if err != nil {
+		fmt.Printf("Warning: failed to get total local user count: %v\n", err)
+	}
+	return &types.LeaderboardData{
+		Leaderboard: leaderboard,
+		CurrentUser: currentUserRank,
+		TotalUsers:  len(totalLocalUsers),
 	}, nil
 }
 
@@ -292,27 +385,27 @@ func (s *RankService) getCurrentUserRank(ctx context.Context, userID string) (*t
 	).With(
 		db.Rank.User.Fetch(),
 	).Exec(ctx)
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	user := userRank.User()
-	
+
 	// Count users with more points to determine rank position
 	higherRanks, err := s.client.Rank.FindMany(
 		db.Rank.Points.Gt(userRank.Points),
 	).Exec(ctx)
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	firstName, _ := user.FirstName()
 	lastName, _ := user.LastName()
 	userName, _ := user.UserName()
 	imageURL := user.ImageURL
-	
+
 	return &types.LeaderboardEntry{
 		UserID:    user.ID,
 		UserName:  &userName,
@@ -325,3 +418,45 @@ func (s *RankService) getCurrentUserRank(ctx context.Context, userID string) (*t
 	}, nil
 }
 
+
+
+func (s *RankService) getCurrentLocalUserRank(ctx context.Context, userID string, city string) (*types.LeaderboardEntry, error) {
+    // Get all ranks for users in the same city, ordered by points
+    allLocalRanks, err := s.client.Rank.FindMany(
+        db.Rank.User.Where(
+            db.User.City.Equals(city),
+        ),
+    ).With(
+        db.Rank.User.Fetch(),
+    ).OrderBy(
+        db.Rank.Points.Order(db.DESC),
+    ).Exec(ctx)
+    
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch local ranks: %w", err)
+    }
+
+    // Find the current user's position in the local ranking
+    for i, rank := range allLocalRanks {
+        user := rank.User()
+        if user.ID == userID {
+            firstName, _ := user.FirstName()
+            lastName, _ := user.LastName()
+            userName, _ := user.UserName()
+            imageURL := user.ImageURL
+            
+            return &types.LeaderboardEntry{
+                UserID:    user.ID,
+                UserName:  &userName,
+                FirstName: &firstName,
+                LastName:  &lastName,
+                ImageURL:  &imageURL,
+                Points:    rank.Points,
+                Level:     string(rank.Level),
+                Rank:      i + 1, // Position in local ranking
+            }, nil
+        }
+    }
+    
+    return nil, fmt.Errorf("user not found in local rankings")
+}

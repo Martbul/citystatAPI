@@ -9,6 +9,10 @@ import (
 	"citystatAPI/types"
 )
 
+
+const GLOBAL_LEADERBOARD_USER_LIMIT = 20
+const LOCAL_LEADERBOARD_USER_LIMIT = 20
+
 type RankHandler struct {
 	rankService *services.RankService
 }
@@ -78,8 +82,7 @@ func (h *RankHandler) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get limit from query params (default 10)
-	limit := 10
+	limit := GLOBAL_LEADERBOARD_USER_LIMIT
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
 			limit = parsedLimit
@@ -93,4 +96,31 @@ func (h *RankHandler) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	middleware.JSONResponse(w, leaderboard, http.StatusOK)
+}
+
+// GetLocalLeaderboard handles GET /api/rank/leaderboard/local
+func (h *RankHandler) GetLocalLeaderboard(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r)
+	if !ok {
+		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+		return
+	}
+
+
+	limit := LOCAL_LEADERBOARD_USER_LIMIT
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
+			limit = parsedLimit
+		}
+	}
+
+	leaderboard, err := h.rankService.GetLocalLeaderboard(r.Context(), limit, userID)
+	if err != nil {
+		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	middleware.JSONResponse(w, leaderboard, http.StatusOK)
+
+
 }

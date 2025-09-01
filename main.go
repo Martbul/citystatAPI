@@ -121,6 +121,8 @@ func main() {
 	protected.HandleFunc("/rank", rankHandler.GetUserRank).Methods("GET")
 	protected.HandleFunc("/rank/progress", rankHandler.GetLevelProgress).Methods("GET")
 	protected.HandleFunc("/rank/leaderboard", rankHandler.GetLeaderboard).Methods("GET")
+	protected.HandleFunc("/rank/leaderboard/local", rankHandler.GetLocalLeaderboard).Methods("GET")
+
 
 	// Add UploadThing routes
 	protected.PathPrefix("/uploadthing").HandlerFunc(uploadHandler.UploadThingProxy)
