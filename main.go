@@ -12,8 +12,10 @@ import (
 	appMiddleware "citystatAPI/middleware"
 	"citystatAPI/prisma/db"
 	"citystatAPI/services"
+
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
@@ -22,6 +24,8 @@ import (
 
 var (
 	client          *db.PrismaClient
+	redisClient     *redis.Client
+	rateLimiter     *appMiddleware.RateLimiter
 	userService     *services.UserService
 	settingsService *services.SettingsService
 	friendService   *services.FriendService
@@ -40,6 +44,33 @@ func init() {
 	}
 	log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...")
 
+	// Initialize Redis client
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "localhost:6379" // Default for development
+	}
+	
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:         redisURL,
+		Password:     os.Getenv("REDIS_PASSWORD"),
+		DB:           0,
+		DialTimeout:  10 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		PoolSize:     10,
+		PoolTimeout:  30 * time.Second,
+	})
+
+	// Test Redis connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Printf("Warning: Redis connection failed: %v. Rate limiting will use fallback mode.", err)
+	} else {
+		log.Println("Redis connected successfully")
+	}
+
 	clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
 
 	client = db.NewClient()
@@ -47,20 +78,43 @@ func init() {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
+	// Initialize services
 	userService = services.NewUserService(client)
 	settingsService = services.NewSettingsService(client)
 	friendService = services.NewFriendService(client)
 	rankService = services.NewRankService(client)
 	visitorService = services.NewVisitorService(client, rankService)
 
+	// Initialize rate limiter
+	rateLimiter = appMiddleware.NewRateLimiter(redisClient)
+	
+	// Set up user tiers (you'd typically load this from your database)
+	setupUserTiers()
+
+}
+
+
+func setupUserTiers() {
+	// Example: Set user tiers based on your business logic
+	// In production, you'd fetch this from your database
+	
+	// You could have a service method to check user subscription status
+	// rateLimiter.SetUserTier("premium_user_id", appMiddleware.TierPremium)
+	// rateLimiter.SetUserTier("enterprise_user_id", appMiddleware.TierEnterprise)
+	
+	log.Println("User tiers initialized")
 }
 
 func main() {
 	defer func() {
 		if err := client.Prisma.Disconnect(); err != nil {
-			log.Printf("Failed to disconnect: %v", err)
+			log.Printf("Failed to disconnect from database: %v", err)
+		}
+		if err := redisClient.Close(); err != nil {
+			log.Printf("Failed to disconnect from Redis: %v", err)
 		}
 	}()
+
 
 	tempLogger := hclog.Default()
 
@@ -75,8 +129,15 @@ func main() {
 
 	r := mux.NewRouter()
 
-	// Public invite routes (no auth required for initial processing)
+	// Add rate limiting middleware BEFORE other middlewares
+	r.Use(rateLimiter.SmartRateLimiter())
+
+	// Public invite routes (no auth required but still rate limited)
 	r.HandleFunc("/invite", inviteHandler.ProcessInvite).Methods("GET")
+
+	//! Add rate limit monitoring endpoint for admins
+	// r.HandleFunc("/admin/rate-limit/stats", getRateLimitStats).Methods("GET")
+
 
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
