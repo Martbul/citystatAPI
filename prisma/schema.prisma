@@ -19,13 +19,12 @@ model User {
   phoneNumber String?
   city        String?
   
-  // New city-related fields
-  cityName     String?  // Name of the selected city
-  cityCountry  String?  // Country of the selected city
-  cityState    String?  // State/Province of the selected city (optional)
-  cityLat      Float?   // Latitude coordinate
-  cityLng      Float?   // Longitude coordinate
-  cityDisplayName String? // Full display name from the API
+  cityName     String?  
+  cityCountry  String?  
+  cityState    String?  
+  cityLat      Float?   
+  cityLng      Float?  
+  cityDisplayName String? 
 
   cityStats         CityStat?
   role              Role      @default(USER)

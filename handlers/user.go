@@ -296,6 +296,10 @@ func (h *UserHandler) GetUsersSameCity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+
+	fmt.Println("USERS IN SAME CITY")
+	fmt.Println(users)
+
 	response := types.SearchUsersResponse{Users: users}
 	middleware.JSONResponse(w, response, http.StatusOK)
 }

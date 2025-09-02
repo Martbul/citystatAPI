@@ -688,15 +688,13 @@ func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username s
 
 
 
-// Fixed Service with better error handling and edge case management
 func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) ([]types.UserSearchResult, error) {
 	fmt.Printf("Getting users in same city for: %s\n", clerkUserID)
 	
-	// Add context timeout to prevent hanging requests
+	// context timeout to prevent hanging requests
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// 1. Fetch current user to get their city
 	currentUser, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
 	).Exec(ctx)
@@ -717,7 +715,7 @@ func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) 
 
 	fmt.Printf("Searching for users in city: %s\n", cityName)
 
-	// 2. Fetch current user's friends (both directions) - with error handling
+	//  Fetch current user's friends (both directions) 
 	friendIDs := make(map[string]struct{})
 	
 	// Add current user to excluded IDs to avoid returning themselves
@@ -729,7 +727,6 @@ func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) 
 	).Exec(ctx)
 	if err != nil {
 		fmt.Printf("Warning: failed to fetch outgoing friendships: %v\n", err)
-		// Don't return error here - continue without friend filtering
 	} else {
 		for _, f := range friendships {
 			friendIDs[f.FriendID] = struct{}{}
@@ -786,7 +783,7 @@ func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) 
 
 	fmt.Printf("Found %d users in city %s\n", len(usersInCity), cityName)
 
-	// 4. Convert to response format with null safety
+	//  Convert to response format with null safety
 	results := make([]types.UserSearchResult, len(usersInCity))
 	for i, user := range usersInCity {
 		// Handle optional fields safely
@@ -802,9 +799,8 @@ func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) 
 		if un, hasUN := user.UserName(); hasUN {
 			userName = un
 		}
-		// if user.ImageURL != nil {
-		// 	imageURL = *&user.ImageURL
-		// }
+	
+		imageURL = user.ImageURL
 
 		results[i] = types.UserSearchResult{
 			ID:        user.ID,
