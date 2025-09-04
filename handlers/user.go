@@ -12,7 +12,6 @@ import (
 	"citystatAPI/utils"
 )
 
-// UserHandler handles user-related routes
 type UserHandler struct {
 	userService *services.UserService
 }

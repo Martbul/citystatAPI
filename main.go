@@ -23,14 +23,15 @@ import (
 )
 
 var (
-	client          *db.PrismaClient
-	redisClient     *redis.Client
-	rateLimiter     *appMiddleware.RateLimiter
-	userService     *services.UserService
-	settingsService *services.SettingsService
-	friendService   *services.FriendService
-	visitorService  *services.VisitorService
-	rankService     *services.RankService
+	client           *db.PrismaClient
+	redisClient      *redis.Client
+	rateLimiter      *appMiddleware.RateLimiter
+	userService      *services.UserService
+	settingsService  *services.SettingsService
+	friendService    *services.FriendService
+	visitorService   *services.VisitorService
+	rankService      *services.RankService
+	analyticsService *services.AnalyticsService
 )
 
 func init() {
@@ -49,7 +50,7 @@ func init() {
 	if redisURL == "" {
 		redisURL = "localhost:6379" // Default for development
 	}
-	
+
 	redisClient = redis.NewClient(&redis.Options{
 		Addr:         redisURL,
 		Password:     os.Getenv("REDIS_PASSWORD"),
@@ -64,7 +65,7 @@ func init() {
 	// Test Redis connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := redisClient.Ping(ctx).Err(); err != nil {
 		log.Printf("Warning: Redis connection failed: %v. Rate limiting will use fallback mode.", err)
 	} else {
@@ -84,24 +85,24 @@ func init() {
 	friendService = services.NewFriendService(client)
 	rankService = services.NewRankService(client)
 	visitorService = services.NewVisitorService(client, rankService)
+	analyticsService = services.NewAnalyticsService(client)
 
 	// Initialize rate limiter
 	rateLimiter = appMiddleware.NewRateLimiter(redisClient)
-	
+
 	// Set up user tiers (you'd typically load this from your database)
 	setupUserTiers()
 
 }
 
-
 func setupUserTiers() {
 	// Example: Set user tiers based on your business logic
 	// In production, you'd fetch this from your database
-	
+
 	// You could have a service method to check user subscription status
 	// rateLimiter.SetUserTier("premium_user_id", appMiddleware.TierPremium)
 	// rateLimiter.SetUserTier("enterprise_user_id", appMiddleware.TierEnterprise)
-	
+
 	log.Println("User tiers initialized")
 }
 
@@ -115,7 +116,6 @@ func main() {
 		}
 	}()
 
-
 	tempLogger := hclog.Default()
 
 	userHandler := appHandlers.NewUserHandler(userService)
@@ -125,7 +125,8 @@ func main() {
 	inviteHandler := appHandlers.NewInviteHandler(userService, friendService)
 	uploadHandler := appHandlers.NewUploadHandler()
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
-	rankHandler := appHandlers.NewRankHandler(rankService) // New rank handler
+	rankHandler := appHandlers.NewRankHandler(rankService)
+	AnaliticsHandler := appHandlers.NewAnaliticsHandler(analyticsService)
 
 	r := mux.NewRouter()
 
@@ -137,7 +138,6 @@ func main() {
 
 	//! Add rate limit monitoring endpoint for admins
 	// r.HandleFunc("/admin/rate-limit/stats", getRateLimitStats).Methods("GET")
-
 
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
@@ -184,6 +184,13 @@ func main() {
 	protected.HandleFunc("/rank/leaderboard", rankHandler.GetLeaderboard).Methods("GET")
 	protected.HandleFunc("/rank/leaderboard/local", rankHandler.GetLocalLeaderboard).Methods("GET")
 
+	// Analitics routes
+	protected.HandleFunc("/analytics/main2stats", AnaliticsHandler.GetMain2Stats).Methods("GET")
+
+	// Documents
+	//! privacy policy
+	//! terms of service
+	//! open source licens
 
 	// Add UploadThing routes
 	protected.PathPrefix("/uploadthing").HandlerFunc(uploadHandler.UploadThingProxy)
