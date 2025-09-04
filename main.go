@@ -186,6 +186,8 @@ func main() {
 
 	// Analitics routes
 	protected.HandleFunc("/analytics/main2stats", AnaliticsHandler.GetMain2Stats).Methods("GET")
+	protected.HandleFunc("/analytics/mainRadarChartData", AnaliticsHandler.GetMainRadarChartData).Methods("GET")
+	protected.HandleFunc("/analytics/mainRadarChartData/detailed", AnaliticsHandler.GetMainRadarChartDataDetailed).Methods("GET")
 
 	// Documents
 	//! privacy policy

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type AnalyticsService struct {
@@ -21,7 +22,6 @@ func NewAnalyticsService(client *db.PrismaClient) *AnalyticsService {
 	return &AnalyticsService{client: client}
 }
 
-// ! edit the return type
 func (s *AnalyticsService) GetMain2Stats(ctx context.Context, clerkUserID string) (*types.City2MainStats, error) {
 	currUserCity, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
@@ -66,8 +66,6 @@ out geom;
 
 	return stats, nil
 }
-
-
 
 // getCityBoundingBox fetches city boundaries from Nominatim
 func getCityBoundingBox(ctx context.Context, cityName string) (*BoundingBox, error) {
@@ -181,7 +179,7 @@ func calculateStreetStats(cityName string, data *types.OverpassResponse) *types.
 	for _, element := range data.Elements {
 		if element.Type == "way" && len(element.Geometry) > 1 {
 			stats.TotalStreets++
-			
+
 			// Count street types
 			highway := element.Tags.Highway
 			if highway != "" {
@@ -233,8 +231,222 @@ func parseFloat(s string) float64 {
 	return 0.0
 }
 
-
-
 type BoundingBox struct {
 	North, South, East, West float64
+}
+
+// MonthlyIntervalData represents the data structure for chart visualization
+type MonthlyIntervalData struct {
+	CurrentMonth  MonthIntervals `json:"currentMonth"`
+	PreviousMonth MonthIntervals `json:"previousMonth"`
+}
+
+type MonthIntervals struct {
+	Month     string         `json:"month"`     // "2024-09" format
+	MonthName string         `json:"monthName"` // "September 2024"
+	Intervals map[string]int `json:"intervals"` // interval -> count
+	Total     int            `json:"total"`
+}
+
+type IntervalRange struct {
+	Start int
+	End   int
+	Label string
+}
+
+func (s *AnalyticsService) GetMainRadarChartData(ctx context.Context, clerkUserID string) (*MonthlyIntervalData, error) {
+
+	// Define the intervals
+	intervals := []IntervalRange{
+		{Start: 1, End: 6, Label: "1-6"},
+		{Start: 7, End: 11, Label: "7-11"},
+		{Start: 12, End: 16, Label: "12-16"},
+		{Start: 17, End: 21, Label: "17-21"},
+		{Start: 22, End: 26, Label: "22-26"},
+		{Start: 27, End: 31, Label: "27-31"},
+	}
+
+	// Calculate date range (past 2 months)
+	now := time.Now()
+	startDate := now.AddDate(0, -2, 0).Truncate(24 * time.Hour)
+
+	// Get current and previous month info
+	currentMonth := now.AddDate(0, -1, 0)  // Last month
+	previousMonth := now.AddDate(0, -2, 0) // 2 months ago
+
+	// Query visited streets for the past 2 months
+	visitedStreets, err := s.client.VisitedStreet.FindMany(
+		db.VisitedStreet.UserID.Equals(clerkUserID),
+		db.VisitedStreet.CreatedAt.Gte(startDate),
+	).Exec(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get visited streets: %w", err)
+	}
+
+	if visitedStreets == nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	// Initialize result structure
+	result := &MonthlyIntervalData{
+		CurrentMonth: MonthIntervals{
+			Month:     currentMonth.Format("2006-01"),
+			MonthName: currentMonth.Format("January 2006"),
+			Intervals: make(map[string]int),
+			Total:     0,
+		},
+		PreviousMonth: MonthIntervals{
+			Month:     previousMonth.Format("2006-01"),
+			MonthName: previousMonth.Format("January 2006"),
+			Total:     0,
+			Intervals: make(map[string]int),
+		},
+	}
+
+	// Initialize all intervals with 0
+	for _, interval := range intervals {
+		result.CurrentMonth.Intervals[interval.Label] = 0
+		result.PreviousMonth.Intervals[interval.Label] = 0
+	}
+
+	// Process visited streets
+	for _, visitedStreet := range visitedStreets {
+		visitDate := visitedStreet.CreatedAt
+		day := visitDate.Day()
+
+		// Determine which interval this day falls into
+		intervalLabel := getIntervalLabel(day, intervals)
+
+		// Determine which month this belongs to
+		if isSameMonth(visitDate, currentMonth) {
+			result.CurrentMonth.Intervals[intervalLabel]++
+			result.CurrentMonth.Total++
+		} else if isSameMonth(visitDate, previousMonth) {
+			result.PreviousMonth.Intervals[intervalLabel]++
+			result.PreviousMonth.Total++
+		}
+	}
+
+	return result, nil
+}
+
+// Helper function to determine which interval a day belongs to
+func getIntervalLabel(day int, intervals []IntervalRange) string {
+	for _, interval := range intervals {
+		if day >= interval.Start && day <= interval.End {
+			return interval.Label
+		}
+	}
+	return "unknown" // shouldn't happen for valid days 1-31
+}
+
+// Helper function to check if two dates are in the same month
+func isSameMonth(date1, date2 time.Time) bool {
+	return date1.Year() == date2.Year() && date1.Month() == date2.Month()
+}
+
+// Alternative version if you want more detailed breakdown with specific days
+type DetailedMonthlyData struct {
+	CurrentMonth  DetailedMonth `json:"current_month"`
+	PreviousMonth DetailedMonth `json:"previous_month"`
+}
+
+type DetailedMonth struct {
+	Month     string                    `json:"month"`
+	MonthName string                    `json:"month_name"`
+	Intervals map[string]IntervalDetail `json:"intervals"`
+	Total     int                       `json:"total"`
+}
+
+type IntervalDetail struct {
+	Count int            `json:"count"`
+	Days  map[string]int `json:"days"` // day -> count
+	Range string         `json:"range"`
+}
+
+func (s *AnalyticsService) GetMainRadarChartDataDetailed(ctx context.Context, clerkUserID string) (*DetailedMonthlyData, error) {
+	intervals := []IntervalRange{
+		{Start: 1, End: 6, Label: "1-6"},
+		{Start: 7, End: 11, Label: "7-11"},
+		{Start: 12, End: 16, Label: "12-16"},
+		{Start: 17, End: 21, Label: "17-21"},
+		{Start: 22, End: 26, Label: "22-26"},
+		{Start: 27, End: 31, Label: "27-31"},
+	}
+
+	now := time.Now()
+	startDate := now.AddDate(0, -2, 0).Truncate(24 * time.Hour)
+	// Get current and previous month info
+
+	currentMonth := now.AddDate(0, -1, 0)  // Last month
+	previousMonth := now.AddDate(0, -2, 0) // 2 months ago
+
+	visitedStreets, err := s.client.VisitedStreet.FindMany(
+		db.VisitedStreet.UserID.Equals(clerkUserID),
+		db.VisitedStreet.CreatedAt.Gte(startDate),
+	).Exec(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get visited streets: %w", err)
+	}
+
+	if visitedStreets == nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	// Initialize detailed result structure
+	result := &DetailedMonthlyData{
+		CurrentMonth: DetailedMonth{
+			Month:     currentMonth.Format("2006-01"),
+			MonthName: currentMonth.Format("January 2006"),
+			Intervals: make(map[string]IntervalDetail),
+			Total:     0,
+		},
+		PreviousMonth: DetailedMonth{
+			Month:     previousMonth.Format("2006-01"),
+			MonthName: previousMonth.Format("January 2006"),
+			Intervals: make(map[string]IntervalDetail),
+			Total:     0,
+		},
+	}
+
+	// Initialize intervals
+	for _, interval := range intervals {
+		result.CurrentMonth.Intervals[interval.Label] = IntervalDetail{
+			Count: 0,
+			Days:  make(map[string]int),
+			Range: interval.Label,
+		}
+		result.PreviousMonth.Intervals[interval.Label] = IntervalDetail{
+			Count: 0,
+			Days:  make(map[string]int),
+			Range: interval.Label,
+		}
+	}
+
+	// Process visited streets
+	for _, visitedStreet := range visitedStreets {
+		visitDate := visitedStreet.CreatedAt
+		day := visitDate.Day()
+		dayStr := fmt.Sprintf("%d", day)
+
+		intervalLabel := getIntervalLabel(day, intervals)
+
+		if isSameMonth(visitDate, currentMonth) {
+			detail := result.CurrentMonth.Intervals[intervalLabel]
+			detail.Count++
+			detail.Days[dayStr]++
+			result.CurrentMonth.Intervals[intervalLabel] = detail
+			result.CurrentMonth.Total++
+		} else if isSameMonth(visitDate, previousMonth) {
+			detail := result.PreviousMonth.Intervals[intervalLabel]
+			detail.Count++
+			detail.Days[dayStr]++
+			result.PreviousMonth.Intervals[intervalLabel] = detail
+			result.PreviousMonth.Total++
+		}
+	}
+
+	return result, nil
 }
