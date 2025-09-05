@@ -196,25 +196,37 @@ func (h *UserHandler) UpdateActiveHours(w http.ResponseWriter, r *http.Request) 
         return
     }
 
-    // Use ONLY your ParseJSON helper - remove the json.NewDecoder line
+    fmt.Printf("UpdateActiveHours called for user: %s\n", userID)
+
     updateReq, err := utils.ParseJSON[map[string]interface{}](r)
     if err != nil {
+        fmt.Printf("Error parsing JSON: %v\n", err)
         middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
         return
     }
     
-    fmt.Println("req body parsed")
+    fmt.Printf("Request body parsed: %+v\n", updateReq)
+    
+    // Validate activeHours exists and is the right type
+    activeHours, exists := updateReq["activeHours"]
+    if !exists {
+        fmt.Println("activeHours field missing from request")
+        middleware.ErrorResponse(w, "activeHours field is required", http.StatusBadRequest)
+        return
+    }
+    
+    fmt.Printf("activeHours value: %v (type: %T)\n", activeHours, activeHours)
     
     user, err := h.userService.UpdateActiveHours(r.Context(), userID, updateReq)
     if err != nil {
+        fmt.Printf("Service error: %v\n", err)
         middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
         return
     }
     
-    fmt.Println("user updated successfully")
+    fmt.Printf("User updated successfully: %+v\n", user)
     middleware.JSONResponse(w, user, http.StatusOK)
 }
-
 
 
 func (h *UserHandler) UpdateUserSettings(w http.ResponseWriter, r *http.Request) {

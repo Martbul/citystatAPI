@@ -538,24 +538,44 @@ func (s *UserService) EditNote(ctx context.Context, clerkUserID string, updates 
 }
 
 
-
 func (s *UserService) UpdateActiveHours(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
-	activeHours, ok := updates["activeHours"].(float64)
-	if !ok {
-		return nil, fmt.Errorf("activeHours field is required and must be a int")
-	}
+    fmt.Printf("UpdateActiveHours service called with userID: %s, updates: %+v\n", clerkUserID, updates)
+    
+    activeHoursRaw, ok := updates["activeHours"]
+    if !ok {
+        return nil, fmt.Errorf("activeHours field is required")
+    }
 
-	updatedUser, err := s.client.User.FindUnique(
-		db.User.ID.Equals(clerkUserID),
-	).Update(
-		db.User.ActiveHours.Set(activeHours),
-	).Exec(ctx)
+    // Handle different numeric types that might come from JSON
+    var activeHours float64
+    switch v := activeHoursRaw.(type) {
+    case float64:
+        activeHours = v
+    case float32:
+        activeHours = float64(v)
+    case int:
+        activeHours = float64(v)
+    case int64:
+        activeHours = float64(v)
+    default:
+        return nil, fmt.Errorf("activeHours must be a number, got type %T with value %v", v, v)
+    }
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to update activeHours: %w", err)
-	}
+    fmt.Printf("Parsed activeHours: %f\n", activeHours)
 
-	return updatedUser, nil
+    updatedUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).Update(
+        db.User.ActiveHours.Set(activeHours),
+    ).Exec(ctx)
+
+    if err != nil {
+        fmt.Printf("Database error: %v\n", err)
+        return nil, fmt.Errorf("failed to update activeHours: %w", err)
+    }
+
+    fmt.Printf("Database update successful: %+v\n", updatedUser)
+    return updatedUser, nil
 }
 
 func (s *UserService) UpdateUserImage(ctx context.Context, clerkUserID string, imageURL string) (*db.UserModel, error) {
