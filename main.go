@@ -126,7 +126,7 @@ func main() {
 	uploadHandler := appHandlers.NewUploadHandler()
 	webhookHandler := appHandlers.NewWebhookHandler(client, userService)
 	rankHandler := appHandlers.NewRankHandler(rankService)
-	AnaliticsHandler := appHandlers.NewAnaliticsHandler(analyticsService)
+	// AnaliticsHandler := appHandlers.NewAnaliticsHandler(analyticsService)
 
 	r := mux.NewRouter()
 
@@ -185,9 +185,9 @@ func main() {
 	protected.HandleFunc("/rank/leaderboard/local", rankHandler.GetLocalLeaderboard).Methods("GET")
 
 	// Analitics routes
-	protected.HandleFunc("/analytics/main2stats", AnaliticsHandler.GetMain2Stats).Methods("GET")
-	protected.HandleFunc("/analytics/mainRadarChartData", AnaliticsHandler.GetMainRadarChartData).Methods("GET")
-	protected.HandleFunc("/analytics/mainRadarChartData/detailed", AnaliticsHandler.GetMainRadarChartDataDetailed).Methods("GET")
+	// protected.HandleFunc("/analytics/main2stats", AnaliticsHandler.GetMain2Stats).Methods("GET")
+	// protected.HandleFunc("/analytics/mainRadarChartData", AnaliticsHandler.GetMainRadarChartData).Methods("GET")
+	// protected.HandleFunc("/analytics/mainRadarChartData/detailed", AnaliticsHandler.GetMainRadarChartDataDetailed).Methods("GET")
 
 	// Documents
 	//! privacy policy

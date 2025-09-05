@@ -27,12 +27,11 @@ model User {
   cityDisplayName String?
   cityAllStreetsCount Int?
   cityAllKilometers Float?
-// City bounding box coordinates
   cityBboxNorth Float?
   cityBboxSouth Float?
   cityBboxEast  Float?
   cityBboxWest  Float?
-  
+
   cityStats         CityStat?
   role              Role      @default(USER)
   createdAt         DateTime  @default(now())
