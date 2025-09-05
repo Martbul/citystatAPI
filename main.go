@@ -88,23 +88,23 @@ func init() {
 	analyticsService = services.NewAnalyticsService(client)
 
 	// Initialize rate limiter
-	rateLimiter = appMiddleware.NewRateLimiter(redisClient)
+	// rateLimiter = appMiddleware.NewRateLimiter(redisClient)
 
 	// Set up user tiers (you'd typically load this from your database)
-	setupUserTiers()
+	// setupUserTiers()
 
 }
 
-func setupUserTiers() {
-	// Example: Set user tiers based on your business logic
-	// In production, you'd fetch this from your database
+// func setupUserTiers() {
+// 	// Example: Set user tiers based on your business logic
+// 	// In production, you'd fetch this from your database
 
-	// You could have a service method to check user subscription status
-	// rateLimiter.SetUserTier("premium_user_id", appMiddleware.TierPremium)
-	// rateLimiter.SetUserTier("enterprise_user_id", appMiddleware.TierEnterprise)
+// 	// You could have a service method to check user subscription status
+// 	// rateLimiter.SetUserTier("premium_user_id", appMiddleware.TierPremium)
+// 	// rateLimiter.SetUserTier("enterprise_user_id", appMiddleware.TierEnterprise)
 
-	log.Println("User tiers initialized")
-}
+// 	log.Println("User tiers initialized")
+// }
 
 func main() {
 	defer func() {
