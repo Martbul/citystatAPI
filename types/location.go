@@ -31,6 +31,5 @@ type City2MainStats struct {
 	TotalStreetsCovered        int     `json:"totalStreetsCovered"`
 	TotalKilometersCovered     float64 `json:"totalKilometersCovered"`
 	PercentCityStreetCouverage float64 `json:"PercentCityStreetCouverage"`
-
 	StreetTypes map[string]int `json:"street_types"`
 }

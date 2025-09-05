@@ -24,7 +24,9 @@ model User {
   cityState    String?  
   cityLat      Float?   
   cityLng      Float?  
-  cityDisplayName String? 
+  cityDisplayName String?
+  cityAllStreetsCount Int?
+  cityAllKilometers Float?
 
   cityStats         CityStat?
   role              Role      @default(USER)

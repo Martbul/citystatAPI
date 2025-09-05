@@ -241,61 +241,7 @@ type UserVisitedStreet struct {
 	EntryLng   float64
 	Duration   *int // in seconds, can be nil
 }
-// getCityBoundingBox fetches city boundaries from Nominatim
-func getCityBoundingBox(ctx context.Context, cityName string) (*BoundingBox, error) {
-	nominatimURL := fmt.Sprintf(
-		"https://nominatim.openstreetmap.org/search?q=%s&format=json&limit=1",
-		url.QueryEscape(cityName),
-	)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", nominatimURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "CityStreetAnalyzer/1.0")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var nominatimResults []struct {
-		BoundingBox []string `json:"boundingbox"`
-	}
-
-	if err := json.Unmarshal(body, &nominatimResults); err != nil {
-		return nil, err
-	}
-
-	if len(nominatimResults) == 0 {
-		return nil, fmt.Errorf("city not found: %s", cityName)
-	}
-
-	bbox := nominatimResults[0].BoundingBox
-	if len(bbox) != 4 {
-		return nil, fmt.Errorf("invalid bounding box data")
-	}
-
-	// Parse bounding box coordinates
-	south := parseFloat(bbox[0])
-	north := parseFloat(bbox[1])
-	west := parseFloat(bbox[2])
-	east := parseFloat(bbox[3])
-
-	return &BoundingBox{
-		North: north,
-		South: south,
-		East:  east,
-		West:  west,
-	}, nil
-}
 
 // queryOverpassAPI makes the POST request to Overpass API (recreating your JS fetch)
 func queryOverpassAPI(ctx context.Context, overpassQuery string) (*types.OverpassResponse, error) {
@@ -341,42 +287,6 @@ func queryOverpassAPI(ctx context.Context, overpassQuery string) (*types.Overpas
 	return &overpassResp, nil
 }
 
-// calculateStreetStats processes the Overpass data and calculates statistics
-func calculateStreetStats(cityName string, data *types.OverpassResponse) *types.City2MainStats {
-	stats := &types.City2MainStats{
-		City:        cityName,
-		StreetTypes: make(map[string]int),
-	}
-
-	var totalDistance float64
-
-	for _, element := range data.Elements {
-		if element.Type == "way" && len(element.Geometry) > 1 {
-			stats.TotalStreetsCity++
-
-			// Count street types
-			highway := element.Tags.Highway
-			if highway != "" {
-				stats.StreetTypes[highway]++
-			}
-
-			// Calculate distance for this way
-			wayDistance := 0.0
-			for i := 0; i < len(element.Geometry)-1; i++ {
-				dist := haversineDistance(
-					element.Geometry[i].Lat, element.Geometry[i].Lon,
-					element.Geometry[i+1].Lat, element.Geometry[i+1].Lon,
-				)
-				wayDistance += dist
-			}
-			totalDistance += wayDistance
-		}
-	}
-
-
-	stats.TotalKilometersCity = totalDistance
-	return stats
-}
 
 // haversineDistance calculates the distance between two points in kilometers
 func haversineDistance(lat1, lon1, lat2, lon2 float64) float64 {

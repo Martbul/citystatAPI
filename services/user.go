@@ -2,7 +2,11 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"time"
 
 	"citystatAPI/prisma/db"
@@ -19,149 +23,285 @@ func NewUserService(client *db.PrismaClient) *UserService {
 	return &UserService{client: client}
 }
 
-
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
-    fmt.Println("updating user")
-    fmt.Println(updates)
-    
-    // Ensure user exists first
-    existingUser, err := s.client.User.FindUnique(
-        db.User.ID.Equals(clerkUserID),
-    ).With(
-        db.User.Settings.Fetch(),
-    ).Exec(ctx)
-    if err != nil {
-        if err == db.ErrNotFound {
-            // User doesn't exist, sync from Clerk first
-            user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
-            if syncErr != nil {
-                return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
-            }
-            existingUser = user
-        } else {
-            return nil, fmt.Errorf("error checking existing user: %w", err)
-        }
-    }
-    
-    // Build update operations based on provided fields
-    updateOps := []db.UserSetParam{}
-    
-    // Handle basic user fields
-    if updates.FirstName != nil {
-        updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
-    }
-    if updates.LastName != nil {
-        updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
-    }
-    if updates.UserName != nil {
-        updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
-    }
-    if updates.ImageURL != nil {
-        updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
-    }
-    if updates.CompletedTutorial != nil {
-        updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
-    }
-    
-    // Handle city data - ONLY use SelectedCity OR individual fields, not both
-    var cityNameForStats *string
-    
-    if updates.SelectedCity != nil {
-        // Use SelectedCity object (preferred approach for frontend)
-        city := updates.SelectedCity
-        updateOps = append(updateOps, db.User.CityName.Set(city.Name))
-        updateOps = append(updateOps, db.User.CityCountry.Set(city.Country))
-        updateOps = append(updateOps, db.User.CityLat.Set(city.Lat))
-        updateOps = append(updateOps, db.User.CityLng.Set(city.Lon))
-        updateOps = append(updateOps, db.User.CityDisplayName.Set(city.DisplayName))
-        
-        // Update the legacy city field for backward compatibility
-        updateOps = append(updateOps, db.User.City.Set(city.Name))
-        
-        // Handle optional state
-        if city.State != nil {
-            updateOps = append(updateOps, db.User.CityState.Set(*city.State))
-        }
-        
-        cityNameForStats = &city.Name
-        
-    } else {
-        // Use individual fields (fallback approach)
-        // Only process individual fields if SelectedCity is NOT provided
-        
-        if updates.CityName != nil {
-            updateOps = append(updateOps, db.User.CityName.Set(*updates.CityName))
-            // Update legacy city field for backward compatibility
-            updateOps = append(updateOps, db.User.City.Set(*updates.CityName))
-            cityNameForStats = updates.CityName
-        }
-        if updates.CityCountry != nil {
-            updateOps = append(updateOps, db.User.CityCountry.Set(*updates.CityCountry))
-        }
-        if updates.CityState != nil {
-            updateOps = append(updateOps, db.User.CityState.Set(*updates.CityState))
-        }
-        if updates.CityCoords != nil {
-            updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
-            updateOps = append(updateOps, db.User.CityLng.Set(updates.CityCoords.Lng))
-        }
-    }
-    
-    // If no updates provided, return existing user
-    if len(updateOps) == 0 {
-        return existingUser, nil
-    }
-    
-    // Perform the update
-    updatedUser, err := s.client.User.FindUnique(
-        db.User.ID.Equals(clerkUserID),
-    ).Update(updateOps...).Exec(ctx)
-    if err != nil {
-        return nil, fmt.Errorf("failed to update user: %w", err)
-    }
-    
-    // If this is the first time setting city data, initialize CityStat
-    if cityNameForStats != nil {
-        err = s.initializeCityStatsIfNeeded(ctx, clerkUserID, cityNameForStats)
-        if err != nil {
-            // Log error but don't fail the user update
-            fmt.Printf("Warning: failed to initialize city stats for user %s: %v\n", clerkUserID, err)
-        }
-    }
-    
-    return updatedUser, nil
+	fmt.Println("updating user")
+	fmt.Println(updates)
+
+	// Ensure user exists first
+	existingUser, err := s.client.User.FindUnique(
+		db.User.ID.Equals(clerkUserID),
+	).With(
+		db.User.Settings.Fetch(),
+	).Exec(ctx)
+	if err != nil {
+		if err == db.ErrNotFound {
+			// User doesn't exist, sync from Clerk first
+			user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
+			if syncErr != nil {
+				return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
+			}
+			existingUser = user
+		} else {
+			return nil, fmt.Errorf("error checking existing user: %w", err)
+		}
+	}
+
+	// Build update operations based on provided fields
+	updateOps := []db.UserSetParam{}
+
+	// Handle basic user fields
+	if updates.FirstName != nil {
+		updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
+	}
+	if updates.LastName != nil {
+		updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
+	}
+	if updates.UserName != nil {
+		updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
+	}
+	if updates.ImageURL != nil {
+		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
+	}
+	if updates.CompletedTutorial != nil {
+		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
+	}
+
+	// Handle city data - ONLY use SelectedCity OR individual fields, not both
+	var cityNameForStats *string
+
+	if updates.SelectedCity != nil {
+		// Use SelectedCity object (preferred approach for frontend)
+		city := updates.SelectedCity
+		updateOps = append(updateOps, db.User.CityName.Set(city.Name))
+		updateOps = append(updateOps, db.User.CityCountry.Set(city.Country))
+		updateOps = append(updateOps, db.User.CityLat.Set(city.Lat))
+		updateOps = append(updateOps, db.User.CityLng.Set(city.Lon))
+		updateOps = append(updateOps, db.User.CityDisplayName.Set(city.DisplayName))
+
+		// Update the legacy city field for backward compatibility
+		updateOps = append(updateOps, db.User.City.Set(city.Name))
+
+		// Handle optional state
+		if city.State != nil {
+			updateOps = append(updateOps, db.User.CityState.Set(*city.State))
+		}
+
+		cityNameForStats = &city.Name
+
+	} else {
+		// Use individual fields (fallback approach)
+		// Only process individual fields if SelectedCity is NOT provided
+
+		if updates.CityName != nil {
+			updateOps = append(updateOps, db.User.CityName.Set(*updates.CityName))
+			// Update legacy city field for backward compatibility
+			updateOps = append(updateOps, db.User.City.Set(*updates.CityName))
+			cityNameForStats = updates.CityName
+		}
+		if updates.CityCountry != nil {
+			updateOps = append(updateOps, db.User.CityCountry.Set(*updates.CityCountry))
+		}
+		if updates.CityState != nil {
+			updateOps = append(updateOps, db.User.CityState.Set(*updates.CityState))
+		}
+		if updates.CityCoords != nil {
+			updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
+			updateOps = append(updateOps, db.User.CityLng.Set(updates.CityCoords.Lng))
+		}
+	}
+
+	// If no updates provided, return existing user
+	if len(updateOps) == 0 {
+		return existingUser, nil
+	}
+
+	// Perform the update
+	updatedUser, err := s.client.User.FindUnique(
+		db.User.ID.Equals(clerkUserID),
+	).Update(updateOps...).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+
+	s.updateUserCityData(ctx, existingUser)
+
+	// If this is the first time setting city data, initialize CityStat
+	if cityNameForStats != nil {
+		err = s.initializeCityStatsIfNeeded(ctx, clerkUserID, cityNameForStats)
+		if err != nil {
+			// Log error but don't fail the user update
+			fmt.Printf("Warning: failed to initialize city stats for user %s: %v\n", clerkUserID, err)
+		}
+	}
+
+	return updatedUser, nil
 }
 
+func (s *UserService) updateUserCityData(ctx context.Context, existingUser *db.UserModel) error {
+	cityName, ok := existingUser.City()
+	if !ok {
+		fmt.Printf("Error: failed to get total user city: %v\n", ok)
+
+	}
+
+	bbox, err := getCityBoundingBox(ctx, cityName)
+	if err != nil {
+		return fmt.Errorf("failed to get city boundaries: %w", err)
+
+	}
+
+	// Create Overpass query for the city
+	overpassQuery := fmt.Sprintf(`
+[out:json][timeout:30];
+(
+  way["highway"~"^(primary|secondary|tertiary|residential|trunk|motorway|unclassified|living_street|service|footway|path|cycleway|track)$"]
+    (%f,%f,%f,%f);
+);
+out geom;
+`, bbox.South, bbox.West, bbox.North, bbox.East)
+
+	// Make request to Overpass API
+	overpassData, err := queryOverpassAPI(ctx, overpassQuery)
+	if err != nil {
+		return fmt.Errorf("failed to query Overpass API: %w", err)
+	}
+
+	stats := calculateStreetStats(cityName, overpassData)
+
+	_, err = s.client.User.FindUnique(
+		db.User.ID.Equals(existingUser.ID),
+	).Update(
+		db.User.CityAllStreetsCount.Set(stats.TotalStreetsCity),
+		db.User.CityAllKilometers.Set(stats.TotalKilometersCity),
+	).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return nil
+
+}
+
+// calculateStreetStats processes the Overpass data and calculates statistics
+func calculateStreetStats(cityName string, data *types.OverpassResponse) *types.City2MainStats {
+	stats := &types.City2MainStats{
+		City:        cityName,
+		StreetTypes: make(map[string]int),
+	}
+
+	var totalDistance float64
+
+	for _, element := range data.Elements {
+		if element.Type == "way" && len(element.Geometry) > 1 {
+			stats.TotalStreetsCity++
+
+			// Count street types
+			highway := element.Tags.Highway
+			if highway != "" {
+				stats.StreetTypes[highway]++
+			}
+
+			// Calculate distance for this way
+			wayDistance := 0.0
+			for i := 0; i < len(element.Geometry)-1; i++ {
+				dist := haversineDistance(
+					element.Geometry[i].Lat, element.Geometry[i].Lon,
+					element.Geometry[i+1].Lat, element.Geometry[i+1].Lon,
+				)
+				wayDistance += dist
+			}
+			totalDistance += wayDistance
+		}
+	}
+
+	stats.TotalKilometersCity = totalDistance
+	return stats
+}
+
+// getCityBoundingBox fetches city boundaries from Nominatim
+func getCityBoundingBox(ctx context.Context, cityName string) (*BoundingBox, error) {
+	nominatimURL := fmt.Sprintf(
+		"https://nominatim.openstreetmap.org/search?q=%s&format=json&limit=1",
+		url.QueryEscape(cityName),
+	)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", nominatimURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "CityStreetAnalyzer/1.0")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var nominatimResults []struct {
+		BoundingBox []string `json:"boundingbox"`
+	}
+
+	if err := json.Unmarshal(body, &nominatimResults); err != nil {
+		return nil, err
+	}
+
+	if len(nominatimResults) == 0 {
+		return nil, fmt.Errorf("city not found: %s", cityName)
+	}
+
+	bbox := nominatimResults[0].BoundingBox
+	if len(bbox) != 4 {
+		return nil, fmt.Errorf("invalid bounding box data")
+	}
+
+	// Parse bounding box coordinates
+	south := parseFloat(bbox[0])
+	north := parseFloat(bbox[1])
+	west := parseFloat(bbox[2])
+	east := parseFloat(bbox[3])
+
+	return &BoundingBox{
+		North: north,
+		South: south,
+		East:  east,
+		West:  west,
+	}, nil
+}
 
 // Helper method to initialize CityStat if it doesn't exist
 func (s *UserService) initializeCityStatsIfNeeded(ctx context.Context, userID string, cityName *string) error {
-    if cityName == nil {
-        return nil
-    }
-    
-    // Check if CityStat already exists
-    _, err := s.client.CityStat.FindUnique(
-        db.CityStat.UserID.Equals(userID),
-    ).Exec(ctx)
-    
-    if err == db.ErrNotFound {
-        // Create new CityStat with proper relation setup
-        _, err = s.client.CityStat.CreateOne(
-            db.CityStat.City.Set(*cityName),
-            db.CityStat.User.Link(
-                db.User.ID.Equals(userID),
-            ),
-        ).Exec(ctx)
-        if err != nil {
-            return fmt.Errorf("failed to create city stats: %w", err)
-        }
-    } else if err != nil {
-        return fmt.Errorf("failed to check existing city stats: %w", err)
-    }
-    
-    return nil
-}
+	if cityName == nil {
+		return nil
+	}
 
+	// Check if CityStat already exists
+	_, err := s.client.CityStat.FindUnique(
+		db.CityStat.UserID.Equals(userID),
+	).Exec(ctx)
+
+	if err == db.ErrNotFound {
+		// Create new CityStat with proper relation setup
+		_, err = s.client.CityStat.CreateOne(
+			db.CityStat.City.Set(*cityName),
+			db.CityStat.User.Link(
+				db.User.ID.Equals(userID),
+			),
+		).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to create city stats: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to check existing city stats: %w", err)
+	}
+
+	return nil
+}
 
 func (s *UserService) SyncUserFromClerk(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
 	fmt.Printf("[SyncUserFromClerk] Starting sync for Clerk user ID: %s\n", clerkUserID)
@@ -296,7 +436,6 @@ func (s *UserService) ensureUserHasSettings(ctx context.Context, userID string) 
 	return nil
 }
 
-
 func (s *UserService) GetOrCreateUser(ctx context.Context, clerkUserID string) (*db.UserModel, error) {
 	user, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
@@ -333,7 +472,6 @@ func (s *UserService) EditNote(ctx context.Context, clerkUserID string, updates 
 
 	return updatedUser, nil
 }
-
 
 func (s *UserService) UpdateUserImage(ctx context.Context, clerkUserID string, imageURL string) (*db.UserModel, error) {
 	updatedUser, err := s.client.User.FindUnique(
@@ -587,7 +725,6 @@ func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string
 	).With(
 		db.User.Settings.Fetch(),
 		db.User.Friends.Fetch(),
-		
 	).Exec(ctx)
 
 	if err != nil {
@@ -596,8 +733,6 @@ func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string
 
 	return updatedUser, nil
 }
-
-
 
 // UpdateUserProfile handles mixed user and settings updates
 func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
@@ -636,8 +771,6 @@ func getBoolPointer(data map[string]interface{}, key string) *bool {
 	return nil
 }
 
-
-
 func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username string) ([]types.UserSearchResult, error) {
 	// Get current user's friends to check friend status
 	currentUserFriends, err := s.client.Friend.FindMany(
@@ -671,7 +804,7 @@ func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username s
 		firstName, _ := user.FirstName()
 		lastName, _ := user.LastName()
 		userName, _ := user.UserName()
-		imageURL:= user.ImageURL
+		imageURL := user.ImageURL
 		results[i] = types.UserSearchResult{
 			ID:        user.ID,
 			UserName:  &userName,
@@ -685,12 +818,9 @@ func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username s
 	return results, nil
 }
 
-
-
-
 func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) ([]types.UserSearchResult, error) {
 	fmt.Printf("Getting users in same city for: %s\n", clerkUserID)
-	
+
 	// context timeout to prevent hanging requests
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -715,9 +845,9 @@ func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) 
 
 	fmt.Printf("Searching for users in city: %s\n", cityName)
 
-	//  Fetch current user's friends (both directions) 
+	//  Fetch current user's friends (both directions)
 	friendIDs := make(map[string]struct{})
-	
+
 	// Add current user to excluded IDs to avoid returning themselves
 	friendIDs[clerkUserID] = struct{}{}
 
@@ -799,7 +929,7 @@ func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) 
 		if un, hasUN := user.UserName(); hasUN {
 			userName = un
 		}
-	
+
 		imageURL = user.ImageURL
 
 		results[i] = types.UserSearchResult{
@@ -814,7 +944,6 @@ func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) 
 
 	return results, nil
 }
-
 
 // Add this health check method to your UserService
 func (s *UserService) HealthCheck(ctx context.Context) error {
