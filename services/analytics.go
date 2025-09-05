@@ -23,30 +23,103 @@ type AnalyticsService struct {
 func NewAnalyticsService(client *db.PrismaClient) *AnalyticsService {
 	return &AnalyticsService{client: client}
 }
-
 func (s *AnalyticsService) GetMain2Stats(ctx context.Context, clerkUserID string) (*types.City2MainStats, error) {
-	currUserCity, err := s.client.User.FindUnique(
+	// Get user data including cached city stats and bounding box
+	currUser, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),
 	).Select(
 		db.User.City.Field(),
+		db.User.CityAllStreetsCount.Field(),
+		db.User.CityAllKilometers.Field(),
+		db.User.CityBboxNorth.Field(),
+		db.User.CityBboxSouth.Field(),
+		db.User.CityBboxEast.Field(),
+		db.User.CityBboxWest.Field(),
 	).Exec(ctx)
 
 	if err != nil {
-		fmt.Printf("Error: failed to get total user city: %v\n", err)
-
+		return nil, fmt.Errorf("failed to get user data: %w", err)
 	}
 
-	cityName, ok := currUserCity.City()
+	cityName, ok := currUser.City()
 	if !ok {
-		fmt.Printf("Error: failed to get total user city: %v\n", err)
-
+		return nil, fmt.Errorf("user has no city set")
 	}
 
-	bbox, err := getCityBoundingBox(ctx, cityName)
+	// Check if we have cached city data
+	totalStreetsCity, hasCachedStreets := currUser.CityAllStreetsCount()
+	totalKilometersCity, hasCachedKilometers := currUser.CityAllKilometers()
+	
+	var bbox *BoundingBox
+	
+	// Try to get bounding box from database first
+	if north, hasNorth := currUser.CityBboxNorth(); hasNorth {
+		if south, hasSouth := currUser.CityBboxSouth(); hasSouth {
+			if east, hasEast := currUser.CityBboxEast(); hasEast {
+				if west, hasWest := currUser.CityBboxWest(); hasWest {
+					bbox = &BoundingBox{
+						North: north,
+						South: south,
+						East:  east,
+						West:  west,
+					}
+				}
+			}
+		}
+	}
+
+	// If we don't have bounding box cached, fetch it from API
+	if bbox == nil {
+		fetchedBbox, err := getCityBoundingBox(ctx, cityName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get city boundaries: %w", err)
+		}
+		bbox = fetchedBbox
+		
+		// Cache the bounding box for future use
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			
+			_, err := s.client.User.FindUnique(
+				db.User.ID.Equals(clerkUserID),
+			).Update(
+				db.User.CityBboxNorth.Set(bbox.North),
+				db.User.CityBboxSouth.Set(bbox.South),
+				db.User.CityBboxEast.Set(bbox.East),
+				db.User.CityBboxWest.Set(bbox.West),
+			).Exec(bgCtx)
+			
+			if err != nil {
+				fmt.Printf("Failed to cache bounding box for user %s: %v\n", clerkUserID, err)
+			}
+		}()
+	}
+
+	// Get user's visited streets data
+	userVisitedStreets, err := s.getUserVisitedStreets(ctx, clerkUserID, bbox)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get city boundaries: %w", err)
+		return nil, fmt.Errorf("failed to get user visited streets: %w", err)
 	}
 
+	// If we have cached city data, use it
+	if hasCachedStreets && hasCachedKilometers {
+		stats := &types.City2MainStats{
+			City:                cityName,
+			TotalStreetsCity:    totalStreetsCity,
+			TotalKilometersCity: totalKilometersCity,
+			StreetTypes:         make(map[string]int), // We could cache this too if needed
+		}
+
+		// Calculate user-specific stats
+		s.calculateUserStats(stats, userVisitedStreets)
+		
+		return stats, nil
+	}
+
+	// Fallback: If no cached data, fetch from Overpass API
+	fmt.Printf("No cached city data for user %s, fetching from Overpass API\n", clerkUserID)
+	
 	// Create Overpass query for the city
 	overpassQuery := fmt.Sprintf(`
 [out:json][timeout:30];
@@ -62,17 +135,28 @@ out geom;
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Overpass API: %w", err)
 	}
-// Get user's visited streets data
-	userVisitedStreets, err := s.getUserVisitedStreets(ctx, clerkUserID, bbox)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user visited streets: %w", err)
-	}
 
 	// Calculate statistics including user coverage
 	stats := calculateStreetStatsWithUserData(cityName, overpassData, userVisitedStreets)
 
-	return stats, nil
+	// Cache the city data for future use
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		
+		_, err := s.client.User.FindUnique(
+			db.User.ID.Equals(clerkUserID),
+		).Update(
+			db.User.CityAllStreetsCount.Set(stats.TotalStreetsCity),
+			db.User.CityAllKilometers.Set(stats.TotalKilometersCity),
+		).Exec(bgCtx)
+		
+		if err != nil {
+			fmt.Printf("Failed to cache city stats for user %s: %v\n", clerkUserID, err)
+		}
+	}()
 
+	return stats, nil
 }
 
 func calculateStreetStatsWithUserData(cityName string, cityData *types.OverpassResponse, userVisitedStreets []UserVisitedStreet) *types.City2MainStats {
@@ -241,6 +325,53 @@ type UserVisitedStreet struct {
 	EntryLng   float64
 	Duration   *int // in seconds, can be nil
 }
+
+// calculateUserStats calculates user-specific statistics when we have cached city data
+func (s *AnalyticsService) calculateUserStats(stats *types.City2MainStats, userVisitedStreets []UserVisitedStreet) {
+	visitedStreetIDs := make(map[string]bool)
+	var totalUserDistance float64
+
+	for _, userStreet := range userVisitedStreets {
+		// Deduplicate by street ID
+		if !visitedStreetIDs[userStreet.StreetID] {
+			visitedStreetIDs[userStreet.StreetID] = true
+			stats.TotalStreetsCovered++
+
+			// Estimate distance based on duration and average walking speed
+			if userStreet.Duration != nil && *userStreet.Duration > 0 {
+				// Assume average walking speed of 5 km/h
+				estimatedDistance := (float64(*userStreet.Duration) / 3600.0) * 5.0
+				totalUserDistance += estimatedDistance
+			} else {
+				// Fallback: use average street length
+				totalUserDistance += 0.1 // 100 meters as default
+			}
+		}
+	}
+
+	// Alternative approach: Calculate user coverage based on unique street names if no street IDs
+	if stats.TotalStreetsCovered == 0 {
+		visitedStreetNames := make(map[string]bool)
+		for _, userStreet := range userVisitedStreets {
+			if !visitedStreetNames[userStreet.StreetName] {
+				visitedStreetNames[userStreet.StreetName] = true
+				stats.TotalStreetsCovered++
+				// Use average street length estimation
+				totalUserDistance += 0.15 // 150 meters as average street length
+			}
+		}
+	}
+
+	// Set final values
+	stats.TotalKilometersCovered = totalUserDistance
+	
+	// Calculate percentage coverage
+	if stats.TotalStreetsCity > 0 {
+		stats.PercentCityStreetCouverage = (float64(stats.TotalStreetsCovered) / float64(stats.TotalStreetsCity)) * 100
+	}
+}
+
+
 
 
 // queryOverpassAPI makes the POST request to Overpass API (recreating your JS fetch)

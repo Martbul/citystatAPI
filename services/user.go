@@ -216,11 +216,17 @@ out geom;
 
 	stats := calculateStreetStats(cityName, overpassData)
 
+
+
 	_, err = s.client.User.FindUnique(
 		db.User.ID.Equals(existingUser.ID),
 	).Update(
 		db.User.CityAllStreetsCount.Set(stats.TotalStreetsCity),
 		db.User.CityAllKilometers.Set(stats.TotalKilometersCity),
+		db.User.CityBboxNorth.Set(bbox.North),
+		db.User.CityBboxSouth.Set(bbox.South),
+		db.User.CityBboxEast.Set(bbox.East),
+		db.User.CityBboxWest.Set(bbox.West),
 	).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
@@ -228,6 +234,7 @@ out geom;
 
 	return nil
 }
+//! add the city bounding box to priosma so that you do0nt have to do a call to overpass again
 
 func (s *UserService) Shutdown() {
 	fmt.Println("Shutting down UserService...")
