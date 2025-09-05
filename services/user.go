@@ -15,14 +15,55 @@ import (
 	"github.com/clerk/clerk-sdk-go/v2/user"
 )
 
+type CityDataProcessingRequest struct {
+	UserID string
+	User   *db.UserModel
+}
+
 type UserService struct {
-	client *db.PrismaClient
+	client         *db.PrismaClient
+	cityDataQueue  chan CityDataProcessingRequest
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
+}
+
+func (s *UserService) cityDataProcessor() {
+	for {
+		select {
+		case req := <-s.cityDataQueue:
+			// Create context with timeout for this specific job
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			
+			fmt.Printf("Processing city data for user %s in background\n", req.UserID)
+			if err := s.updateUserCityData(ctx, req.User); err != nil {
+				fmt.Printf("Failed to process city data for user %s: %v\n", req.UserID, err)
+			} else {
+				fmt.Printf("Successfully processed city data for user %s\n", req.UserID)
+			}
+			
+			cancel()
+			
+		case <-s.shutdownCtx.Done():
+			fmt.Println("City data processor shutting down")
+			return
+		}
+	}
 }
 
 func NewUserService(client *db.PrismaClient) *UserService {
-	return &UserService{client: client}
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &UserService{
+		client:         client,
+		cityDataQueue:  make(chan CityDataProcessingRequest, 50),
+		shutdownCtx:    ctx,
+		shutdownCancel: cancel,
+	}
+	
+	// Start background workers
+	go s.cityDataProcessor()
+	
+	return s
 }
-
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
 	fmt.Println("updating user")
 	fmt.Println(updates)
@@ -123,10 +164,19 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
 
-	s.updateUserCityData(ctx, existingUser)
-
-	// If this is the first time setting city data, initialize CityStat
+	// Queue city data processing instead of doing it synchronously
 	if cityNameForStats != nil {
+		select {
+		case s.cityDataQueue <- CityDataProcessingRequest{
+			UserID: clerkUserID,
+			User:   updatedUser,
+		}:
+			fmt.Printf("Queued city data processing for user %s\n", clerkUserID)
+		default:
+			fmt.Printf("City data queue full, will retry city data processing for user %s\n", clerkUserID)
+		}
+
+		// Initialize CityStat synchronously (this should be fast)
 		err = s.initializeCityStatsIfNeeded(ctx, clerkUserID, cityNameForStats)
 		if err != nil {
 			// Log error but don't fail the user update
@@ -136,18 +186,16 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 
 	return updatedUser, nil
 }
-
 func (s *UserService) updateUserCityData(ctx context.Context, existingUser *db.UserModel) error {
 	cityName, ok := existingUser.City()
 	if !ok {
 		fmt.Printf("Error: failed to get total user city: %v\n", ok)
-
+		return fmt.Errorf("failed to get city name from user")
 	}
 
 	bbox, err := getCityBoundingBox(ctx, cityName)
 	if err != nil {
 		return fmt.Errorf("failed to get city boundaries: %w", err)
-
 	}
 
 	// Create Overpass query for the city
@@ -179,9 +227,21 @@ out geom;
 	}
 
 	return nil
-
 }
 
+func (s *UserService) Shutdown() {
+	fmt.Println("Shutting down UserService...")
+	s.shutdownCancel()
+	
+	// Give some time for current jobs to finish
+	time.Sleep(5 * time.Second)
+	
+	// Drain remaining jobs from queue
+	close(s.cityDataQueue)
+	for req := range s.cityDataQueue {
+		fmt.Printf("Draining queued city data job for user %s\n", req.UserID)
+	}
+}
 // calculateStreetStats processes the Overpass data and calculates statistics
 func calculateStreetStats(cityName string, data *types.OverpassResponse) *types.City2MainStats {
 	stats := &types.City2MainStats{
@@ -217,8 +277,6 @@ func calculateStreetStats(cityName string, data *types.OverpassResponse) *types.
 	stats.TotalKilometersCity = totalDistance
 	return stats
 }
-
-// getCityBoundingBox fetches city boundaries from Nominatim
 func getCityBoundingBox(ctx context.Context, cityName string) (*BoundingBox, error) {
 	nominatimURL := fmt.Sprintf(
 		"https://nominatim.openstreetmap.org/search?q=%s&format=json&limit=1",
@@ -273,7 +331,6 @@ func getCityBoundingBox(ctx context.Context, cityName string) (*BoundingBox, err
 		West:  west,
 	}, nil
 }
-
 // Helper method to initialize CityStat if it doesn't exist
 func (s *UserService) initializeCityStatsIfNeeded(ctx context.Context, userID string, cityName *string) error {
 	if cityName == nil {
