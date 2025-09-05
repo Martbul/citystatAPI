@@ -537,6 +537,27 @@ func (s *UserService) EditNote(ctx context.Context, clerkUserID string, updates 
 	return updatedUser, nil
 }
 
+
+
+func (s *UserService) UpdateActiveHours(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
+	activeHours, ok := updates["activeHours"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("activeHours field is required and must be a int")
+	}
+
+	updatedUser, err := s.client.User.FindUnique(
+		db.User.ID.Equals(clerkUserID),
+	).Update(
+		db.User.ActiveHours.Set(activeHours),
+	).Exec(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to update activeHours: %w", err)
+	}
+
+	return updatedUser, nil
+}
+
 func (s *UserService) UpdateUserImage(ctx context.Context, clerkUserID string, imageURL string) (*db.UserModel, error) {
 	updatedUser, err := s.client.User.FindUnique(
 		db.User.ID.Equals(clerkUserID),

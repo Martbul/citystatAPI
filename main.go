@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	client           *db.PrismaClient
+	client *db.PrismaClient
 	// redisClient      *redis.Client
 	// rateLimiter      *appMiddleware.RateLimiter
 	userService      *services.UserService
@@ -154,6 +154,7 @@ func main() {
 	protected.HandleFunc("/user/note", userHandler.EditNote).Methods("PUT")
 	protected.HandleFunc("/users/search", userHandler.SearchUsers).Methods("GET")
 	protected.HandleFunc("/users/sameCity", userHandler.GetUsersSameCity).Methods("GET")
+	protected.HandleFunc("/users/activeHours", userHandler.UpdateActiveHours).Methods("PUT")
 
 	// Friend routes
 	protected.HandleFunc("/friends/profile", friendHandler.GetFriendProfile).Methods("POST")
@@ -177,6 +178,8 @@ func main() {
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.SaveLocationPermission).Methods("POST")
 	protected.HandleFunc("/visitor/streets", visitorHandler.GetVisitedStreets).Methods("GET")
 	protected.HandleFunc("/visitor/streets", visitorHandler.SaveVisitedStreets).Methods("POST")
+	protected.HandleFunc("/visitor/streets/visitStats", visitorHandler.GetStreetVisitStats).Methods("GET")
+	protected.HandleFunc("/visitor/streets/visitStats", visitorHandler.SaveStreetVisitStats).Methods("POST")
 
 	// Rank routes
 	protected.HandleFunc("/rank", rankHandler.GetUserRank).Methods("GET")
@@ -189,6 +192,7 @@ func main() {
 	protected.HandleFunc("/analytics/mainRadarChartData", analiticsHandler.GetMainRadarChartData).Methods("GET")
 	protected.HandleFunc("/analytics/mainRadarChartData/detailed", analiticsHandler.GetMainRadarChartDataDetailed).Methods("GET")
 
+	
 	// Documents
 	//! privacy policy
 	//! terms of service
