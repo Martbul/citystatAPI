@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type AnalyticsService struct {
@@ -60,13 +62,185 @@ out geom;
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Overpass API: %w", err)
 	}
+// Get user's visited streets data
+	userVisitedStreets, err := s.getUserVisitedStreets(ctx, clerkUserID, bbox)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user visited streets: %w", err)
+	}
 
-	// Calculate statistics
-	stats := calculateStreetStats(cityName, overpassData)
+	// Calculate statistics including user coverage
+	stats := calculateStreetStatsWithUserData(cityName, overpassData, userVisitedStreets)
 
 	return stats, nil
+
 }
 
+func calculateStreetStatsWithUserData(cityName string, cityData *types.OverpassResponse, userVisitedStreets []UserVisitedStreet) *types.City2MainStats {
+	stats := &types.City2MainStats{
+		City:        cityName,
+		StreetTypes: make(map[string]int),
+	}
+
+	var totalCityDistance float64
+	
+	// Create a map to store all city streets for matching
+	cityStreets := make(map[string]*types.Element)
+	
+	// Process city data
+	for _, element := range cityData.Elements {
+		if element.Type == "way" && len(element.Geometry) > 1 {
+			stats.TotalStreetsCity++
+
+			// Count street types
+			highway := element.Tags.Highway
+			if highway != "" {
+				stats.StreetTypes[highway]++
+			}
+
+			// Calculate distance for this way
+			wayDistance := 0.0
+			for i := 0; i < len(element.Geometry)-1; i++ {
+				dist := haversineDistance(
+					element.Geometry[i].Lat, element.Geometry[i].Lon,
+					element.Geometry[i+1].Lat, element.Geometry[i+1].Lon,
+				)
+				wayDistance += dist
+			}
+			totalCityDistance += wayDistance
+			
+			// Store street with its distance for user matching
+			streetKey := fmt.Sprintf("%d", element.ID)
+			cityStreets[streetKey] = &element
+		}
+	}
+
+	// Process user visited streets
+	visitedStreetIDs := make(map[string]bool)
+	var totalUserDistance float64
+
+	for _, userStreet := range userVisitedStreets {
+		// Deduplicate by street ID
+		if !visitedStreetIDs[userStreet.StreetID] {
+			visitedStreetIDs[userStreet.StreetID] = true
+			stats.TotalStreetsCovered++
+
+			// Try to match with city streets to calculate distance
+			if cityElement, exists := cityStreets[userStreet.StreetID]; exists {
+				streetDistance := calculateStreetDistance(cityElement)
+				totalUserDistance += streetDistance
+			} else {
+				// Fallback: estimate distance based on duration and average walking speed
+				if userStreet.Duration != nil && *userStreet.Duration > 0 {
+					// Assume average walking speed of 5 km/h
+					estimatedDistance := (float64(*userStreet.Duration) / 3600.0) * 5.0
+					totalUserDistance += estimatedDistance
+				}
+			}
+		}
+	}
+
+	// Alternative approach: Calculate user coverage based on unique street names
+	// This is more accurate if street IDs don't match between your data and OSM
+	if stats.TotalStreetsCovered == 0 {
+		visitedStreetNames := make(map[string]bool)
+		for _, userStreet := range userVisitedStreets {
+			if !visitedStreetNames[userStreet.StreetName] {
+				visitedStreetNames[userStreet.StreetName] = true
+				stats.TotalStreetsCovered++
+				
+				// Estimate distance based on street name matching with OSM data
+				distance := estimateDistanceByStreetName(userStreet.StreetName, cityData)
+				totalUserDistance += distance
+			}
+		}
+	}
+
+	// Set final values
+	stats.TotalKilometersCity = totalCityDistance
+	stats.TotalKilometersCovered = totalUserDistance
+	
+	// Calculate percentage coverage
+	if stats.TotalStreetsCity > 0 {
+		stats.PercentCityStreetCouverage = (float64(stats.TotalStreetsCovered) / float64(stats.TotalStreetsCity)) * 100
+	}
+
+	return stats
+}
+
+// calculateStreetDistance calculates the total distance of a street from its geometry
+func calculateStreetDistance(element *types.Element) float64 {
+	if len(element.Geometry) < 2 {
+		return 0.0
+	}
+	
+	var totalDistance float64
+	for i := 0; i < len(element.Geometry)-1; i++ {
+		dist := haversineDistance(
+			element.Geometry[i].Lat, element.Geometry[i].Lon,
+			element.Geometry[i+1].Lat, element.Geometry[i+1].Lon,
+		)
+		totalDistance += dist
+	}
+	return totalDistance
+}
+
+func estimateDistanceByStreetName(streetName string, cityData *types.OverpassResponse) float64 {
+	for _, element := range cityData.Elements {
+		if element.Type == "way" && element.Tags.Name == streetName {
+			return calculateStreetDistance(&element)
+		}
+	}
+	
+	// Fallback: return average street length (adjust based on your city)
+	return 0.1 // 100 meters as default
+}
+
+// getUserVisitedStreets retrieves the streets that the user has visited within the city bounds
+func (s *AnalyticsService) getUserVisitedStreets(ctx context.Context, clerkUserID string, bbox *BoundingBox) ([]UserVisitedStreet, error) {
+	// Convert Decimal lat/lng to float64 for comparison
+	southDecimal := decimal.NewFromFloat(bbox.South)
+	northDecimal := decimal.NewFromFloat(bbox.North)
+	westDecimal := decimal.NewFromFloat(bbox.West)
+	eastDecimal := decimal.NewFromFloat(bbox.East)
+
+	visitedStreets, err := s.client.VisitedStreet.FindMany(
+		db.VisitedStreet.UserID.Equals(clerkUserID),
+		db.VisitedStreet.EntryLatitude.Gte(southDecimal),
+		db.VisitedStreet.EntryLatitude.Lte(northDecimal),
+		db.VisitedStreet.EntryLongitude.Gte(westDecimal),
+		db.VisitedStreet.EntryLongitude.Lte(eastDecimal),
+	).Exec(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to our working type
+	var userStreets []UserVisitedStreet
+	for _, street := range visitedStreets {
+		entryLat, _ := street.EntryLatitude.Float64()
+		entryLng, _ := street.EntryLongitude.Float64()
+		drtS,_ := street.DurationSeconds()
+		
+		userStreets = append(userStreets, UserVisitedStreet{
+			StreetID:   street.StreetID,
+			StreetName: street.StreetName,
+			EntryLat:   entryLat,
+			EntryLng:   entryLng,
+			Duration:   &drtS,
+		})
+	}
+
+	return userStreets, nil
+}
+
+type UserVisitedStreet struct {
+	StreetID   string
+	StreetName string
+	EntryLat   float64
+	EntryLng   float64
+	Duration   *int // in seconds, can be nil
+}
 // getCityBoundingBox fetches city boundaries from Nominatim
 func getCityBoundingBox(ctx context.Context, cityName string) (*BoundingBox, error) {
 	nominatimURL := fmt.Sprintf(
@@ -178,7 +352,7 @@ func calculateStreetStats(cityName string, data *types.OverpassResponse) *types.
 
 	for _, element := range data.Elements {
 		if element.Type == "way" && len(element.Geometry) > 1 {
-			stats.TotalStreets++
+			stats.TotalStreetsCity++
 
 			// Count street types
 			highway := element.Tags.Highway
@@ -199,7 +373,8 @@ func calculateStreetStats(cityName string, data *types.OverpassResponse) *types.
 		}
 	}
 
-	stats.TotalKilometers = totalDistance
+
+	stats.TotalKilometersCity = totalDistance
 	return stats
 }
 
