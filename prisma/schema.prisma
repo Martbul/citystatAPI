@@ -31,7 +31,7 @@ model User {
   cityBboxSouth Float?
   cityBboxEast  Float?
   cityBboxWest  Float?
-  activeHours Float? @default(0) // Total active hours spent walking/tracking
+  activeHours Float? @default(0) 
   
   cityStats         CityStat?
   role              Role      @default(USER)
@@ -49,15 +49,187 @@ model User {
   note           String?         @default("")
   status         Status          @default(ACTIVE)
   visitedStreets VisitedStreet[]
-  streetVisitStats StreetVisitStat[] // New relation for visit statistics
+  streetVisitStats StreetVisitStat[]
 
   lastActivity DateTime @default(now())
   lastLogin    DateTime @default(now())
   rankId      String?
   rank              Rank?
+  timeSpentLocations TimeSpentLocation[]
+  stationarySessions StationarySession[]
+  timeSpentSummaries TimeSpentSummary[]
   @@map("users")
 }
 
+model TimeSpentLocation {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Location data
+  centerLatitude   Float    // Center of the tracking circle
+  centerLongitude  Float    // Center of the tracking circle
+  radius           Float    @default(25) // Radius in meters (default 25m)
+  address          String?  // Optional reverse geocoded address
+  placeName        String?  // Optional place name (e.g., "Home", "Office")
+  placeType        String?  // Optional categorization (e.g., "residence", "workplace", "commercial")
+  
+  // Time tracking data
+  totalTimeSpent   Int      // Total seconds spent in this location
+  visitCount       Int      @default(1) // Number of separate visits
+  firstVisit       DateTime // When first visited
+  lastVisit        DateTime // When last visited
+  lastSessionDuration Int   // Duration of the most recent session in seconds
+  
+  // Statistics
+  averageSessionDuration Float? // Average time per visit
+  longestSessionDuration Int?   // Longest single session in seconds
+  
+  // Metadata
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isActive         Boolean  @default(true) // Can be used to soft delete or archive
+  
+  // Relations
+  stationarySessions StationarySession[]
+  timeSpentLocationCategories TimeSpentLocationCategory[]
+  
+  // Indexes for efficient queries
+  @@index([userId])
+  @@index([userId, totalTimeSpent]) // For top locations queries
+  @@index([userId, visitCount])     // For most visited queries
+  @@index([centerLatitude, centerLongitude]) // For location-based queries
+  @@map("time_spent_locations")
+}
+
+// Model for individual stationary sessions
+model StationarySession {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  timeSpentLocationId String?
+  timeSpentLocation   TimeSpentLocation? @relation(fields: [timeSpentLocationId], references: [id], onDelete: SetNull)
+  
+  // Session data
+  startTime        DateTime
+  endTime          DateTime?
+  duration         Int?     // Duration in seconds (calculated when session ends)
+  
+  // Location data for this specific session
+  startLatitude    Float
+  startLongitude   Float
+  endLatitude      Float?
+  endLongitude     Float?
+  
+  // Session metadata
+  sessionId        String   @unique // Client-generated session ID
+  isCompleted      Boolean  @default(false) // Whether the session ended naturally
+  endReason        String?  // Reason session ended: "movement", "timeout", "manual", etc.
+  
+  // Movement data during session
+  maxDistanceFromCenter Float? // Maximum distance user moved from starting point
+  averageSpeed     Float?   // Average movement speed during session
+  movementCount    Int?     // Number of significant movements during session
+  
+  // Context data
+  dayOfWeek        Int?     // 0-6, Sunday = 0
+  hourOfDay        Int?     // 0-23
+  weather          String?  // Optional weather data
+  temperature      Float?   // Optional temperature data
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([userId, startTime])
+  @@index([timeSpentLocationId])
+  @@index([sessionId])
+  @@map("stationary_sessions")
+}
+
+// Optional: Model for tracking daily/weekly/monthly time spent patterns
+model TimeSpentSummary {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Time period
+  date             DateTime // Date for daily summaries
+  summaryType      TimeSpentSummaryType // DAILY, WEEKLY, MONTHLY
+  
+  // Aggregated data
+  totalTimeSpent   Int      // Total seconds for this period
+  totalSessions    Int      // Number of stationary sessions
+  uniqueLocations  Int      // Number of different locations visited
+  averageSessionDuration Float
+  longestSession   Int      // Longest session in seconds
+  
+  // Top location for this period
+  topLocationId    String?
+  topLocationTime  Int?     // Time spent at top location
+  
+  // Activity patterns
+  mostActiveHour   Int?     // Hour of day with most stationary time (0-23)
+  leastActiveHour  Int?     // Hour of day with least stationary time (0-23)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@unique([userId, date, summaryType])
+  @@index([userId, summaryType])
+  @@map("time_spent_summaries")
+}
+
+// Enum for summary types
+enum TimeSpentSummaryType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+// Optional: Model for location categories/tags
+model LocationCategory {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  description      String?
+  color            String?  // Hex color for UI
+  icon             String?  // Icon name or emoji
+  
+  // Relations
+  timeSpentLocations TimeSpentLocationCategory[]
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@map("location_categories")
+}
+
+// Junction table for location categories (many-to-many)
+model TimeSpentLocationCategory {
+  id                    String             @id @default(cuid())
+  timeSpentLocationId   String
+  locationCategoryId    String
+  
+  timeSpentLocation     TimeSpentLocation  @relation(fields: [timeSpentLocationId], references: [id], onDelete: Cascade)
+  locationCategory      LocationCategory   @relation(fields: [locationCategoryId], references: [id], onDelete: Cascade)
+  
+  // Optional: confidence score for auto-categorization
+  confidence           Float?             // 0.0 - 1.0
+  isAutoGenerated      Boolean            @default(false)
+  
+  createdAt            DateTime           @default(now())
+  
+  @@unique([timeSpentLocationId, locationCategoryId])
+  @@map("time_spent_location_categories")
+}
+
+// Add the relation to TimeSpentLocation model:
+// 
+
+// Add the relation to User model:
+// 
 
 model Rank {
   id        String   @id @default(cuid())
