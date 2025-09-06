@@ -30,7 +30,7 @@ func (s *SettingsService) GetUserSettings(ctx context.Context, clerkUserID strin
     return settings, nil
 }
 
-func (s *SettingsService) EditUsername(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
+func (s *SettingsService) UpdateUsername(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
     username, ok := updates["username"].(string)
     if !ok {
         return nil, fmt.Errorf("username field is required and must be a string")
@@ -51,7 +51,7 @@ func (s *SettingsService) EditUsername(ctx context.Context, clerkUserID string, 
 
 //TODO: add validation and error hanling also in the client
 
-func (s *SettingsService) EditPhoneNumber(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
+func (s *SettingsService) UpdatePhoneNumber(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
     phoneNumber, ok := updates["phone"].(string)
 	fmt.Println(phoneNumber)
     if !ok {

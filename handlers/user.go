@@ -89,7 +89,7 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 }
 
 
-func (h *UserHandler) EditProfile(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	// userID, ok := middleware.GetUserID(r)
 	// if !ok {
 	// 	middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
@@ -160,7 +160,7 @@ func (h *UserHandler) SyncProfileFromClerk(w http.ResponseWriter, r *http.Reques
 
 
 
-func (h *UserHandler) EditNote(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) UpdateNote(w http.ResponseWriter, r *http.Request) {
     userID, ok := middleware.GetUserID(r)
     if !ok {
         middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
@@ -176,7 +176,7 @@ func (h *UserHandler) EditNote(w http.ResponseWriter, r *http.Request) {
     
     fmt.Println("req body parsed")
     
-    user, err := h.userService.EditNote(r.Context(), userID, updateReq)
+    user, err := h.userService.UpdateNote(r.Context(), userID, updateReq)
     if err != nil {
         middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
         return

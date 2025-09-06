@@ -66,7 +66,7 @@ func (h *FriendHandler) AddFriend(w http.ResponseWriter, r *http.Request) {
 		Message: "Friend added successfully",
 		Friend:  *friend,
 	}
-	middleware.JSONResponse(w, response, http.StatusOK)
+	middleware.JSONResponse(w, response, http.StatusCreated)
 }
 
 func (h *FriendHandler) GetFriends(w http.ResponseWriter, r *http.Request) {
@@ -156,5 +156,5 @@ func (h *FriendHandler) RemoveFriend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	middleware.JSONResponse(w, map[string]string{"message": "Friend removed successfully"}, http.StatusOK)
+	middleware.JSONResponse(w, map[string]string{"message": "Friend removed successfully"}, http.StatusNoContent)
 }
