@@ -121,66 +121,6 @@ func (s *VisitorService) GetVisitedStreets(ctx context.Context, clerkUserID stri
     }, nil
 }
 
-// func (s *VisitorService) SaveVisitedStreets(ctx context.Context, clerkUserID string, req types.SaveVisitedStreetsRequest) error {
-//     seen := make(map[string]struct{})
-//     for _, street := range req.VisitedStreets {
-//         // Create a unique key based on StreetID and StreetName to avoid duplicates in this batch
-//         key := street.StreetID + "|" + street.StreetName
-//         if _, exists := seen[key]; exists {
-//             continue
-//         }
-//         seen[key] = struct{}{}
-
-//         entryTimestamp := prismaTypes.BigInt(street.EntryTimestamp)
-//         entryLatitude := decimal.NewFromFloat(street.EntryLatitude)
-//         entryLongitude := decimal.NewFromFloat(street.EntryLongitude)
-
-//         // Check if a record with the same StreetID OR StreetName already exists
-//         existingByID, err := s.client.VisitedStreet.FindFirst(
-//             db.VisitedStreet.UserID.Equals(clerkUserID),
-//             db.VisitedStreet.StreetID.Equals(street.StreetID),
-//         ).Exec(ctx)
-//         if err != nil && !errors.Is(err, db.ErrNotFound) {
-//             return err
-//         }
-
-//         existingByName, err := s.client.VisitedStreet.FindFirst(
-//             db.VisitedStreet.UserID.Equals(clerkUserID),
-//             db.VisitedStreet.StreetName.Equals(street.StreetName),
-//         ).Exec(ctx)
-//         if err != nil && !errors.Is(err, db.ErrNotFound) {
-//             return err
-//         }
-
-//         // If neither StreetID nor StreetName exists, create the record
-//         if existingByID == nil && existingByName == nil {
-//             var optionalParams []db.VisitedStreetSetParam
-//             if street.ExitTimestamp != nil {
-//                 exitTimestamp := prismaTypes.BigInt(*street.ExitTimestamp)
-//                 optionalParams = append(optionalParams, db.VisitedStreet.ExitTimestamp.Set(exitTimestamp))
-//             }
-//             if street.DurationSeconds != nil {
-//                 optionalParams = append(optionalParams, db.VisitedStreet.DurationSeconds.Set(*street.DurationSeconds))
-//             }
-
-//             _, err = s.client.VisitedStreet.CreateOne(
-//                 db.VisitedStreet.SessionID.Set(req.SessionID),
-//                 db.VisitedStreet.StreetID.Set(street.StreetID),
-//                 db.VisitedStreet.StreetName.Set(street.StreetName),
-//                 db.VisitedStreet.EntryTimestamp.Set(entryTimestamp),
-//                 db.VisitedStreet.EntryLatitude.Set(entryLatitude),
-//                 db.VisitedStreet.EntryLongitude.Set(entryLongitude),
-//                 db.VisitedStreet.User.Link(db.User.ID.Equals(clerkUserID)),
-//                 optionalParams...,
-//             ).Exec(ctx)
-//             if err != nil {
-//                 return err
-//             }
-//         }
-//         // If either StreetID or StreetName exists, skip this record (don't save)
-//     }
-//     return nil
-// }
 
 func (s *VisitorService) SaveVisitedStreets(ctx context.Context, clerkUserID string, req types.SaveVisitedStreetsRequest) (*types.SaveVisitedStreetsResponse, error) {
 	seen := make(map[string]struct{})

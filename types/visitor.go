@@ -10,7 +10,7 @@ type SaveLocationPermitionResponse struct {
 
 //! ai generated check it
 type SaveVisitedStreetsRequest struct {
-    SessionID      string                   `json:"sessionId"`
+    SessionID      string                       `json:"sessionId"`
     VisitedStreets []VisitedStreetRequest   `json:"visitedStreets"`
 }
 

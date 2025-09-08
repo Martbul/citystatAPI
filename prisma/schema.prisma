@@ -309,6 +309,9 @@ model VisitedStreet {
   @@map("visited_streets")
 }
 
+
+//! merdge StreetVisitStat VisitedStreet
+
 // New model to track street visit statistics
 model StreetVisitStat {
   id                String   @id @default(cuid())
