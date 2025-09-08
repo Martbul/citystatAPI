@@ -470,7 +470,7 @@ type IntervalRange struct {
 	Label string
 }
 
-func (s *AnalyticsService) GetMainRadarChartData(ctx context.Context, clerkUserID string) (*MonthlyIntervalData, error) {
+func (s *AnalyticsService) 	GetMainRadarChartData(ctx context.Context, clerkUserID string) (*MonthlyIntervalData, error) {
 
 	// Define the intervals
 	intervals := []IntervalRange{
@@ -489,6 +489,9 @@ func (s *AnalyticsService) GetMainRadarChartData(ctx context.Context, clerkUserI
 	// Get current and previous month info
 	currentMonth := now.AddDate(0, -1, 0)  // Last month
 	previousMonth := now.AddDate(0, -2, 0) // 2 months ago
+	fmt.Println("-------DEBUG------")
+	fmt.Println(currentMonth)
+	fmt.Println(previousMonth)
 
 	// Query visited streets for the past 2 months
 	visitedStreets, err := s.client.VisitedStreet.FindMany(
@@ -528,7 +531,10 @@ func (s *AnalyticsService) GetMainRadarChartData(ctx context.Context, clerkUserI
 
 	// Process visited streets
 	for _, visitedStreet := range visitedStreets {
+		fmt.Println(visitedStreet)
 		visitDate := visitedStreet.CreatedAt
+				fmt.Println(visitDate)
+
 		day := visitDate.Day()
 
 		// Determine which interval this day falls into
