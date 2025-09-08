@@ -59,43 +59,66 @@ func (s *VisitorService) SaveLocationPermission(ctx context.Context, clerkUserID
 	return updatedSettings.EnabledLocationTracking, nil
 }
 
-func (s *VisitorService) GetVisitedStreets(ctx context.Context, clerkUserID string) ([]types.VisitedStreetRequest, error) {
-	visitedStreets, err := s.client.VisitedStreet.FindMany(
-		db.VisitedStreet.UserID.Equals(clerkUserID),
-	).Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("database error: %w", err)
-	}
 
-	var result []types.VisitedStreetRequest
-	for _, street := range visitedStreets {
-		var exitTimestamp *int64
-		if street.ExitTimestamp != nil {
-			v, _ := street.ExitTimestamp()
-			val := int64(v)
-			exitTimestamp = &val
-		}
 
-		var durationSeconds *int
-		if street.DurationSeconds != nil {
-			v, _ := street.DurationSeconds()
 
-			val := v
-			durationSeconds = &val
-		}
 
-		result = append(result, types.VisitedStreetRequest{
-			StreetID:        street.StreetID,
-			StreetName:      street.StreetName,
-			EntryTimestamp:  int64(street.EntryTimestamp),
-			ExitTimestamp:   exitTimestamp,
-			DurationSeconds: durationSeconds,
-			EntryLatitude:   street.EntryLatitude.InexactFloat64(),
-			EntryLongitude:  street.EntryLongitude.InexactFloat64(),
-		})
-	}
+// Updated function
+func (s *VisitorService) GetVisitedStreets(ctx context.Context, clerkUserID string) (*types.GetVisitedStreetsResponse, error) {
+    visitedStreets, err := s.client.VisitedStreet.FindMany(
+        db.VisitedStreet.UserID.Equals(clerkUserID),
+    ).Exec(ctx)
+    
+    if err != nil {
+        return &types.GetVisitedStreetsResponse{
+            Data:    []types.VisitedStreetRequest{},
+            Message: fmt.Sprintf("Failed to retrieve visited streets: %v", err),
+            Status:  "error",
+        }, fmt.Errorf("database error: %w", err)
+    }
 
-	return result, nil
+    // Handle case where user exists but has no visited streets
+    if len(visitedStreets) == 0 {
+        return &types.GetVisitedStreetsResponse{
+            Data:    []types.VisitedStreetRequest{},
+            Message: "No visited streets found for this user",
+            Status:  "success",
+        }, nil
+    }
+
+    var result []types.VisitedStreetRequest
+    
+    for _, street := range visitedStreets {
+        var exitTimestamp *int64
+        if street.ExitTimestamp != nil {
+            v, _ := street.ExitTimestamp()
+            val := int64(v)
+            exitTimestamp = &val
+        }
+        
+        var durationSeconds *int
+        if street.DurationSeconds != nil {
+            v, _ := street.DurationSeconds()
+            val := v
+            durationSeconds = &val
+        }
+        
+        result = append(result, types.VisitedStreetRequest{
+            StreetID:        street.StreetID,
+            StreetName:      street.StreetName,
+            EntryTimestamp:  int64(street.EntryTimestamp),
+            ExitTimestamp:   exitTimestamp,
+            DurationSeconds: durationSeconds,
+            EntryLatitude:   street.EntryLatitude.InexactFloat64(),
+            EntryLongitude:  street.EntryLongitude.InexactFloat64(),
+        })
+    }
+
+    return &types.GetVisitedStreetsResponse{
+        Data:    result,
+        Message: fmt.Sprintf("Successfully retrieved %d visited streets", len(result)),
+        Status:  "success",
+    }, nil
 }
 
 // func (s *VisitorService) SaveVisitedStreets(ctx context.Context, clerkUserID string, req types.SaveVisitedStreetsRequest) error {

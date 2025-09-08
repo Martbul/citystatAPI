@@ -23,3 +23,10 @@ type VisitedStreetRequest struct {
     EntryLatitude   float64  `json:"entryLatitude"`
     EntryLongitude  float64  `json:"entryLongitude"`
 }
+
+
+type GetVisitedStreetsResponse struct {
+    Data    []VisitedStreetRequest `json:"data"`
+    Message string                 `json:"message"`
+    Status  string                 `json:"status"`
+}
