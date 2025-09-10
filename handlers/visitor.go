@@ -96,40 +96,40 @@ func (h *VisitorHandler) SaveVisitedStreets(w http.ResponseWriter, r *http.Reque
 	middleware.JSONResponse(w, response, http.StatusOK)
 }
 
-func (h *VisitorHandler) GetStreetVisitStats(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r)
-	if !ok {
-		middleware.ErrorResponse(w, "User ID not found", http.StatusUnauthorized)
-		return
-	}
+// func (h *VisitorHandler) GetStreetVisitStats(w http.ResponseWriter, r *http.Request) {
+// 	userID, ok := middleware.GetUserID(r)
+// 	if !ok {
+// 		middleware.ErrorResponse(w, "User ID not found", http.StatusUnauthorized)
+// 		return
+// 	}
 
-	response, err := h.visitorService.GetStreetVisitStats(r.Context(), userID)
-	if err != nil {
-		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+// 	response, err := h.visitorService.GetStreetVisitStats(r.Context(), userID)
+// 	if err != nil {
+// 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
 
-	middleware.JSONResponse(w, response, http.StatusOK)
-}
+// 	middleware.JSONResponse(w, response, http.StatusOK)
+// }
 
-func (h *VisitorHandler) SaveStreetVisitStats(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r)
-	if !ok {
-		middleware.ErrorResponse(w, "User ID not found", http.StatusUnauthorized)
-		return
-	}
+// func (h *VisitorHandler) SaveStreetVisitStats(w http.ResponseWriter, r *http.Request) {
+// 	userID, ok := middleware.GetUserID(r)
+// 	if !ok {
+// 		middleware.ErrorResponse(w, "User ID not found", http.StatusUnauthorized)
+// 		return
+// 	}
 
-	var req types.SaveStreetVisitStatsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
+// 	var req types.SaveStreetVisitStatsRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
+// 		return
+// 	}
 
-	response, err := h.visitorService.SaveStreetVisitStats(r.Context(), userID,req)
-	if err != nil {
-		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+// 	response, err := h.visitorService.SaveStreetVisitStats(r.Context(), userID,req)
+// 	if err != nil {
+// 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
 
-	middleware.JSONResponse(w, response, http.StatusOK)
-}
+// 	middleware.JSONResponse(w, response, http.StatusOK)
+// }

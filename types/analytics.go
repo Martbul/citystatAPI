@@ -7,16 +7,4 @@ type StreetVisitApiResponse struct {
 }
 
 
-type StreetStat struct {
-    StreetID        string  `json:"streetId"`
-    StreetName      string  `json:"streetName"`
-    VisitCount      int64   `json:"visitCount"`
-    FirstVisit      int64   `json:"firstVisit"`
-    LastVisit       int64   `json:"lastVisit"`
-    TotalTimeSpent  int64   `json:"totalTimeSpent"`
-    AverageTimeSpent int64  `json:"averageTimeSpent"`
-}
 
-type SaveStreetVisitStatsRequest struct {
-    StreetStats []StreetStat `json:"streetStats"`
-}

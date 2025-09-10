@@ -49,7 +49,7 @@ model User {
   note           String?         @default("")
   status         Status          @default(ACTIVE)
   visitedStreets VisitedStreet[]
-  streetVisitStats StreetVisitStat[]
+  // streetVisitStats StreetVisitStat[]
 
   lastActivity DateTime @default(now())
   lastLogin    DateTime @default(now())
@@ -225,12 +225,6 @@ model TimeSpentLocationCategory {
   @@map("time_spent_location_categories")
 }
 
-// Add the relation to TimeSpentLocation model:
-// 
-
-// Add the relation to User model:
-// 
-
 model Rank {
   id        String   @id @default(cuid())
   userId    String   @unique
@@ -287,54 +281,75 @@ model CityStat {
 }
 
 model VisitedStreet {
+  // Core identifiers
   id              String   @id @default(cuid())
   userId          String   @map("user_id")
-  sessionId       String   @map("session_id")
   streetId        String   @map("street_id")
+  sessionId       String?  @map("session_id") // optional, since stats may not tie to a session
   streetName      String   @map("street_name")
+
+  // Visit details (from VisitedStreet)
   entryTimestamp  BigInt   @map("entry_timestamp")
   exitTimestamp   BigInt?  @map("exit_timestamp")
   durationSeconds Int?     @map("duration_seconds")
-  entryLatitude   Decimal  @map("entry_latitude") @db.Decimal(10, 8)
-  entryLongitude  Decimal  @map("entry_longitude") @db.Decimal(11, 8)
-  createdAt       DateTime @default(now()) @map("created_at")
-  
+  entryLatitude   Decimal? @map("entry_latitude") @db.Decimal(10, 8)
+  entryLongitude  Decimal? @map("entry_longitude") @db.Decimal(11, 8)
+
+  // Aggregated stats (from StreetVisitStat)
+  visitCount        Int      @default(1) @map("visit_count")
+  firstVisit        BigInt   @map("first_visit")
+  lastVisit         BigInt   @map("last_visit")
+  totalTimeSpent    Int      @default(0) @map("total_time_spent") // seconds
+  averageTimeSpent  Int      @default(0) @map("average_time_spent")
+
+  // Meta
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  // Indexes
+  @@unique([userId, streetId]) // one aggregate record per user-street
   @@index([userId])
-  @@index([sessionId])
   @@index([streetId])
+  @@index([sessionId])
   @@index([entryTimestamp])
-  @@index([userId, streetId]) // Composite index for efficient visit count queries
+  @@index([visitCount])
+  @@index([totalTimeSpent])
   @@map("visited_streets")
 }
 
 
 //! merdge StreetVisitStat VisitedStreet
+//! merdge StreetVisitStat VisitedStreet
+//! merdge StreetVisitStat VisitedStreet
+//! merdge StreetVisitStat VisitedStreet
+//! merdge StreetVisitStat VisitedStreet
 
-// New model to track street visit statistics
-model StreetVisitStat {
-  id                String   @id @default(cuid())
-  userId            String   @map("user_id")
-  streetId          String   @map("street_id")
-  streetName        String   @map("street_name")
-  visitCount        Int      @default(1) @map("visit_count")
-  firstVisit        BigInt   @map("first_visit")
-  lastVisit         BigInt   @map("last_visit")
-  totalTimeSpent    Int      @default(0) @map("total_time_spent") // Total seconds spent on this street
-  averageTimeSpent  Int      @default(0) @map("average_time_spent") // Average seconds per visit
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+// // New model to track street visit statistics
+// model StreetVisitStat {
+//   id                String   @id @default(cuid())
+//   userId            String   @map("user_id")
+//   streetId          String   @map("street_id")
+//   streetName        String   @map("street_name")
+//   visitCount        Int      @default(1) @map("visit_count")
+//   firstVisit        BigInt   @map("first_visit")
+//   lastVisit         BigInt   @map("last_visit")
+//   totalTimeSpent    Int      @default(0) @map("total_time_spent") // Total seconds spent on this street
+//   averageTimeSpent  Int      @default(0) @map("average_time_spent") // Average seconds per visit
+//   createdAt         DateTime @default(now()) @map("created_at")
+//   updatedAt         DateTime @updatedAt @map("updated_at")
   
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+//   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, streetId]) // Ensure one stat record per user per street
-  @@index([userId])
-  @@index([streetId])
-  @@index([visitCount])
-  @@index([totalTimeSpent])
-  @@map("street_visit_stats")
-}
+//   @@unique([userId, streetId]) // Ensure one stat record per user per street
+//   @@index([userId])
+//   @@index([streetId])
+//   @@index([visitCount])
+//   @@index([totalTimeSpent])
+//   @@map("street_visit_stats")
+// }
 
 model Settings {
   id     String @id @default(cuid())

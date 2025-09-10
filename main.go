@@ -178,8 +178,8 @@ func main() {
 	protected.HandleFunc("/visitor/locationPermission", visitorHandler.SaveLocationPermission).Methods("POST")
 	protected.HandleFunc("/visitor/streets", visitorHandler.GetVisitedStreets).Methods("GET")
 	protected.HandleFunc("/visitor/streets", visitorHandler.SaveVisitedStreets).Methods("POST")
-	protected.HandleFunc("/visitor/streets/visitStats", visitorHandler.GetStreetVisitStats).Methods("GET")
-	protected.HandleFunc("/visitor/streets/visitStats", visitorHandler.SaveStreetVisitStats).Methods("POST")
+	// protected.HandleFunc("/visitor/streets/visitStats", visitorHandler.GetStreetVisitStats).Methods("GET")
+	// protected.HandleFunc("/visitor/streets/visitStats", visitorHandler.SaveStreetVisitStats).Methods("POST")
 
 	// Rank routes
 	protected.HandleFunc("/rank", rankHandler.GetUserRank).Methods("GET")
