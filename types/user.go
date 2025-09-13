@@ -17,7 +17,7 @@ type UserUpdateRequest struct {
 	UserName                  *string `json:"userName,omitempty"`
 	ImageURL                  *string `json:"imageUrl,omitempty"`
 	CompletedTutorial         *bool   `json:"completedTutorial,omitempty"`
-	IsLocationTrackingEnabled bool    `json:"isLocationTrackingEnabled"`
+	IsLocationTrackingEnabled bool    `json:"isLocationTrackingEnabled,omitempty"`
 
 	// City selection data
 	SelectedCity *CityData `json:"selectedCity,omitempty"`

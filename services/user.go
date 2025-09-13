@@ -192,6 +192,8 @@ func NewUserService(client *db.PrismaClient) *UserService {
 
 // 	return updatedUser, nil
 // }
+
+
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
 	fmt.Println("updating user")
 	fmt.Println(updates)

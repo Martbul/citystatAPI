@@ -68,6 +68,7 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
 		return
 	}
+	fmt.Println("+++++++++")
 
 	// Parse request body
 	var updateReq types.UserUpdateRequest
@@ -75,7 +76,7 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	fmt.Println("req body parsed")
+	fmt.Println("------------updating user req body parsed")
 
 	// Update user with the provided data
 	user, err := h.userService.UpdateUserDetails(r.Context(), userID, updateReq)
