@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -68,6 +70,8 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
 		return
 	}
+	    body, err := io.ReadAll(r.Body)
+	    log.Printf("Raw request body: %s", string(body))
 	fmt.Println("+++++++++")
 
 	// Parse request body

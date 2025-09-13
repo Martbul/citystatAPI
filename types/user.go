@@ -29,7 +29,7 @@ type UserUpdateRequest struct {
 	CityCoords  *struct {
 		Lat float64 `json:"lat"`
 		Lng float64 `json:"lng"`
-	} `json:"cityCoords,omitempty"`
+	} `json:"cityCoords,omitempty"` 
 }
 
 //TODO: Finish the profile req type and other logi for it
