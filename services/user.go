@@ -280,19 +280,24 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 	}
 
 	// Handle location tracking permission update in Settings
-	// var settingsUpdateNeeded bool
-	// var settingsUpdateOps []db.SettingsSetParam
+	var settingsUpdateNeeded bool
+	var settingsUpdateOps []db.SettingsSetParam
 
-	// // Check if location tracking permission needs to be updated
-	// // Since IsLocationTrackingEnabled is not a pointer, we need to determine if it was actually set
-	// // You might want to make this a pointer in your struct for better control, but for now:
-	// if updates.IsLocationTrackingEnabled != (existingUser.Settings != nil && existingUser.Settings.EnabledLocationTracking) {
-	// 	settingsUpdateNeeded = true
-	// 	settingsUpdateOps = append(settingsUpdateOps, db.Settings.EnabledLocationTracking.Set(updates.IsLocationTrackingEnabled))
-	// 	fmt.Printf("Location tracking permission will be updated to: %v\n", updates.IsLocationTrackingEnabled)
-	// }
+	// Check if location tracking permission needs to be updated
+	// Since IsLocationTrackingEnabled is not a pointer, we need to determine if it was actually set
+	// You might want to make this a pointer in your struct for better control, but for now:
+	if settings, ok := existingUser.Settings(); 
+   updates.IsLocationTrackingEnabled != (ok && settings.EnabledLocationTracking) {
 
-	// // Perform user update if there are changes
+    settingsUpdateNeeded = true
+    settingsUpdateOps = append(settingsUpdateOps,
+        db.Settings.EnabledLocationTracking.Set(updates.IsLocationTrackingEnabled),
+    )
+    fmt.Printf("Location tracking permission will be updated to: %v\n", updates.IsLocationTrackingEnabled)
+}
+
+
+	// Perform user update if there are changes
 	var updatedUser *db.UserModel
 	if len(updateOps) > 0 {
 		updatedUser, err = s.client.User.FindUnique(
@@ -305,26 +310,15 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 		updatedUser = existingUser
 	}
 
-	// // Update settings if location permission changed
-	// if settingsUpdateNeeded {
-	// 	_, err = s.client.Settings.FindUnique(
-	// 		db.Settings.UserID.Equals(clerkUserID),
-	// 	).Update(settingsUpdateOps...).Exec(ctx)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to update location permission: %w", err)
-	// 	}
-	// 	fmt.Printf("Successfully updated location tracking permission for user %s to: %v\n", clerkUserID, updates.IsLocationTrackingEnabled)
-	// }
-
-
-	 s.client.Settings.FindUnique(
-		db.Settings.UserID.Equals(clerkUserID),
-	).Update(
-		db.Settings.EnabledLocationTracking.Set(updates.IsLocationTrackingEnabled),
-	).Exec(ctx)
-
-	if err != nil {
-		return nil, fmt.Errorf("database error: %w", err)
+	// Update settings if location permission changed
+	if settingsUpdateNeeded {
+		_, err = s.client.Settings.FindUnique(
+			db.Settings.UserID.Equals(clerkUserID),
+		).Update(settingsUpdateOps...).Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update location permission: %w", err)
+		}
+		fmt.Printf("Successfully updated location tracking permission for user %s to: %v\n", clerkUserID, updates.IsLocationTrackingEnabled)
 	}
 
 	// Queue city data processing instead of doing it synchronously
