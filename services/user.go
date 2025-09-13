@@ -193,7 +193,6 @@ func NewUserService(client *db.PrismaClient) *UserService {
 // 	return updatedUser, nil
 // }
 
-
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
 	fmt.Println("updating user")
 	fmt.Println(updates)
@@ -220,21 +219,23 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 	// Build update operations based on provided fields
 	updateOps := []db.UserSetParam{}
 
-	// Handle basic user fields
-	if updates.FirstName != nil {
-		updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
+	// Handle basic user fields - NO MORE POINTERS
+	if updates.FirstName != "" {
+		updateOps = append(updateOps, db.User.FirstName.Set(updates.FirstName))
 	}
-	if updates.LastName != nil {
-		updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
+	if updates.LastName != "" {
+		updateOps = append(updateOps, db.User.LastName.Set(updates.LastName))
 	}
-	if updates.UserName != nil {
-		updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
+	if updates.UserName != "" {
+		updateOps = append(updateOps, db.User.UserName.Set(updates.UserName))
 	}
-	if updates.ImageURL != nil {
-		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
+	if updates.ImageURL != "" {
+		updateOps = append(updateOps, db.User.ImageURL.Set(updates.ImageURL))
 	}
-	if updates.CompletedTutorial != nil {
-		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
+	
+	// Handle CompletedTutorial - check if it's different from existing value
+	if existingUser.CompletedTutorial != updates.CompletedTutorial {
+		updateOps = append(updateOps, db.User.CompletedTutorial.Set(updates.CompletedTutorial))
 	}
 
 	// Handle city data - ONLY use SelectedCity OR individual fields, not both
@@ -246,15 +247,15 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 		updateOps = append(updateOps, db.User.CityName.Set(city.Name))
 		updateOps = append(updateOps, db.User.CityCountry.Set(city.Country))
 		updateOps = append(updateOps, db.User.CityLat.Set(city.Lat))
-		updateOps = append(updateOps, db.User.CityLng.Set(city.Lon))
+		updateOps = append(updateOps, db.User.CityLng.Set(city.Lng))
 		updateOps = append(updateOps, db.User.CityDisplayName.Set(city.DisplayName))
 
 		// Update the legacy city field for backward compatibility
 		updateOps = append(updateOps, db.User.City.Set(city.Name))
 
-		// Handle optional state
-		if city.State != nil {
-			updateOps = append(updateOps, db.User.CityState.Set(*city.State))
+		// Handle state (it's a regular string, not pointer)
+		if city.State != "" {
+			updateOps = append(updateOps, db.User.CityState.Set(city.State))
 		}
 
 		cityNameForStats = &city.Name
@@ -263,17 +264,17 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 		// Use individual fields (fallback approach)
 		// Only process individual fields if SelectedCity is NOT provided
 
-		if updates.CityName != nil {
-			updateOps = append(updateOps, db.User.CityName.Set(*updates.CityName))
+		if updates.CityName != "" {
+			updateOps = append(updateOps, db.User.CityName.Set(updates.CityName))
 			// Update legacy city field for backward compatibility
-			updateOps = append(updateOps, db.User.City.Set(*updates.CityName))
-			cityNameForStats = updates.CityName
+			updateOps = append(updateOps, db.User.City.Set(updates.CityName))
+			cityNameForStats = &updates.CityName
 		}
-		if updates.CityCountry != nil {
-			updateOps = append(updateOps, db.User.CityCountry.Set(*updates.CityCountry))
+		if updates.CityCountry != "" {
+			updateOps = append(updateOps, db.User.CityCountry.Set(updates.CityCountry))
 		}
-		if updates.CityState != nil {
-			updateOps = append(updateOps, db.User.CityState.Set(*updates.CityState))
+		if updates.CityState != "" {
+			updateOps = append(updateOps, db.User.CityState.Set(updates.CityState))
 		}
 		if updates.CityCoords != nil {
 			updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
@@ -286,18 +287,20 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 	var settingsUpdateOps []db.SettingsSetParam
 
 	// Check if location tracking permission needs to be updated
-	// Since IsLocationTrackingEnabled is not a pointer, we need to determine if it was actually set
-	// You might want to make this a pointer in your struct for better control, but for now:
-	if settings, ok := existingUser.Settings(); 
-   updates.IsLocationTrackingEnabled != (ok && settings.EnabledLocationTracking) {
-
-    settingsUpdateNeeded = true
-    settingsUpdateOps = append(settingsUpdateOps,
-        db.Settings.EnabledLocationTracking.Set(updates.IsLocationTrackingEnabled),
-    )
-    fmt.Printf("Location tracking permission will be updated to: %v\n", updates.IsLocationTrackingEnabled)
-}
-
+	if settings, ok := existingUser.Settings(); ok {
+		// Settings exist, check if the value is different
+		if settings.EnabledLocationTracking != updates.IsLocationTrackingEnabled {
+			settingsUpdateNeeded = true
+			settingsUpdateOps = append(settingsUpdateOps,
+				db.Settings.EnabledLocationTracking.Set(updates.IsLocationTrackingEnabled),
+			)
+			fmt.Printf("Location tracking permission will be updated to: %v\n", updates.IsLocationTrackingEnabled)
+		}
+	} else {
+		// No settings exist yet, this shouldn't happen if user was properly created
+		// but handle it gracefully
+		fmt.Printf("Warning: User %s has no settings, this should not happen\n", clerkUserID)
+	}
 
 	// Perform user update if there are changes
 	var updatedUser *db.UserModel
@@ -308,8 +311,10 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 		if err != nil {
 			return nil, fmt.Errorf("failed to update user: %w", err)
 		}
+		fmt.Printf("Successfully updated user %s with %d fields\n", clerkUserID, len(updateOps))
 	} else {
 		updatedUser = existingUser
+		fmt.Printf("No user fields to update for user %s\n", clerkUserID)
 	}
 
 	// Update settings if location permission changed
@@ -1000,26 +1005,26 @@ func (s *UserService) UpdateUserSettings(ctx context.Context, clerkUserID string
 }
 
 // UpdateUserProfile handles mixed user and settings updates
-func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
-	fmt.Println("Updating user profile for:", clerkUserID)
-	fmt.Println("Profile data:", updates)
+// func (s *UserService) UpdateUserProfile(ctx context.Context, clerkUserID string, updates map[string]interface{}) (*db.UserModel, error) {
+// 	fmt.Println("Updating user profile for:", clerkUserID)
+// 	fmt.Println("Profile data:", updates)
 
-	// Check if this is a settings-only update
-	if settingsData, hasSettings := updates["settings"]; hasSettings {
-		if settingsMap, ok := settingsData.(map[string]interface{}); ok {
-			return s.UpdateUserSettings(ctx, clerkUserID, settingsMap)
-		}
-	}
+// 	// Check if this is a settings-only update
+// 	if settingsData, hasSettings := updates["settings"]; hasSettings {
+// 		if settingsMap, ok := settingsData.(map[string]interface{}); ok {
+// 			return s.UpdateUserSettings(ctx, clerkUserID, settingsMap)
+// 		}
+// 	}
 
-	// Handle regular user field updates
-	return s.UpdateUserDetails(ctx, clerkUserID, types.UserUpdateRequest{
-		FirstName:         getStringPointer(updates, "firstName"),
-		LastName:          getStringPointer(updates, "lastName"),
-		UserName:          getStringPointer(updates, "userName"),
-		ImageURL:          getStringPointer(updates, "imageURL"),
-		CompletedTutorial: getBoolPointer(updates, "completedTutorial"),
-	})
-}
+// 	// Handle regular user field updates
+// 	return s.UpdateUserDetails(ctx, clerkUserID, types.UserUpdateRequest{
+// 		FirstName:         getStringPointer(updates, "firstName"),
+// 		LastName:          getStringPointer(updates, "lastName"),
+// 		UserName:          getStringPointer(updates, "userName"),
+// 		ImageURL:          getStringPointer(updates, "imageURL"),
+// 		CompletedTutorial: getBoolPointer(updates, "completedTutorial"),
+// 	})
+// }
 
 // Helper functions
 func getStringPointer(data map[string]interface{}, key string) *string {

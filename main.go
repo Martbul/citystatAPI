@@ -149,7 +149,7 @@ func main() {
 	// User routes
 	protected.HandleFunc("/user", userHandler.GetProfile).Methods("GET")
 	protected.HandleFunc("/user/details", userHandler.UpdateUserDetails).Methods("PUT")
-	protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT")
+	// protected.HandleFunc("/settings", userHandler.UpdateUserProfile).Methods("PUT")
 	protected.HandleFunc("/user/profile", userHandler.UpdateProfile).Methods("PUT")
 	protected.HandleFunc("/user/note", userHandler.UpdateNote).Methods("PUT")
 	protected.HandleFunc("/users/search", userHandler.SearchUsers).Methods("GET")

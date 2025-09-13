@@ -71,19 +71,66 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	    body, err := io.ReadAll(r.Body)
+		  if err != nil {
+        log.Printf("Failed to read request body: %v", err)
+        http.Error(w, `{"error":"Failed to read request body"}`, http.StatusBadRequest)
+        return
+    }
+    
 	    log.Printf("Raw request body: %s", string(body))
 	fmt.Println("+++++++++")
 
+	    r.Body = io.NopCloser(strings.NewReader(string(body)))
+
 	// Parse request body
-	var updateReq types.UserUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
-		middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
+    var req types.UserUpdateRequest
+
+	 decoder := json.NewDecoder(r.Body)
+    decoder.DisallowUnknownFields() // This might be causing the issue!
+
+	 if err := decoder.Decode(&req); err != nil {
+        log.Printf("❌ JSON decode error: %v", err)
+        log.Printf("❌ Error type: %T", err)
+        
+        // Try decoding without DisallowUnknownFields
+        r.Body = io.NopCloser(strings.NewReader(string(body)))
+        decoder2 := json.NewDecoder(r.Body)
+        // Don't call DisallowUnknownFields() this time
+        
+        if err2 := decoder2.Decode(&req); err2 != nil {
+            log.Printf("❌ JSON decode error even without DisallowUnknownFields: %v", err2)
+            http.Error(w, fmt.Sprintf(`{"error":"Invalid request body - JSON decode failed: %v"}`, err2), http.StatusBadRequest)
+            return
+        } else {
+            log.Printf("⚠️ JSON decoded successfully WITHOUT DisallowUnknownFields - there might be extra fields")
+        }
+    }
+    
+    log.Printf("✅ Successfully decoded request: %+v", req)
+  log.Printf("FirstName: %s", req.FirstName)
+    log.Printf("LastName: %s", req.LastName)
+    log.Printf("UserName: %s", req.UserName)
+    log.Printf("ImageURL: %s", req.ImageURL)
+    log.Printf("CompletedTutorial: %v", req.CompletedTutorial)
+    log.Printf("IsLocationTrackingEnabled: %v", req.IsLocationTrackingEnabled)
+    
+    if req.SelectedCity != nil {
+        log.Printf("SelectedCity: %+v", *req.SelectedCity)
+        log.Printf("  Name: %s", req.SelectedCity.Name)
+        log.Printf("  Country: %s", req.SelectedCity.Country)
+        log.Printf("  State: %s", req.SelectedCity.State)
+        log.Printf("  Lat: %f", req.SelectedCity.Lat)
+        log.Printf("  Lng: %f", req.SelectedCity.Lng)
+        log.Printf("  DisplayName: %s", req.SelectedCity.DisplayName)
+    } else {
+        log.Printf("SelectedCity: nil")
+    }
+
+	
 	fmt.Println("------------updating user req body parsed")
 
 	// Update user with the provided data
-	user, err := h.userService.UpdateUserDetails(r.Context(), userID, updateReq)
+	user, err := h.userService.UpdateUserDetails(r.Context(), userID, req)
 	if err != nil {
 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -259,30 +306,30 @@ func (h *UserHandler) UpdateUserSettings(w http.ResponseWriter, r *http.Request)
     middleware.JSONResponse(w, user, http.StatusOK)
 }
 
-func (h *UserHandler) UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
-    userID, ok := middleware.GetUserID(r)
-    if !ok {
-        middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
-        return
-    }
+// func (h *UserHandler) UpdateUserProfile(w http.ResponseWriter, r *http.Request) {
+//     userID, ok := middleware.GetUserID(r)
+//     if !ok {
+//         middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+//         return
+//     }
 
-    var updateReq map[string]interface{}
-    if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
-        middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
-        return
-    }
+//     var updateReq map[string]interface{}
+//     if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
+//         middleware.ErrorResponse(w, "Invalid request body", http.StatusBadRequest)
+//         return
+//     }
     
-    fmt.Println("Profile update request:", updateReq)
+//     fmt.Println("Profile update request:", updateReq)
     
-    user, err := h.userService.UpdateUserProfile(r.Context(), userID, updateReq)
-    if err != nil {
-        middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
+//     user, err := h.userService.UpdateUserProfile(r.Context(), userID, updateReq)
+//     if err != nil {
+//         middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+//         return
+//     }
     
-    fmt.Println("Profile updated successfully")
-    middleware.JSONResponse(w, user, http.StatusOK)
-}
+//     fmt.Println("Profile updated successfully")
+//     middleware.JSONResponse(w, user, http.StatusOK)
+// }
 
 
 func (h *UserHandler) SearchUsers(w http.ResponseWriter, r *http.Request) {
