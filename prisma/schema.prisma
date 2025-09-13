@@ -285,7 +285,7 @@ model VisitedStreet {
   id              String   @id @default(cuid())
   userId          String   @map("user_id")
   streetId        String   @map("street_id")
-  sessionId       String?  @map("session_id") // optional, since stats may not tie to a session
+  sessionId       String?  @map("session_id") 
   streetName      String   @map("street_name")
 
   // Visit details (from VisitedStreet)
@@ -309,8 +309,7 @@ model VisitedStreet {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Indexes
-  @@unique([userId, streetId]) // one aggregate record per user-street
+  @@unique([userId, streetId]) 
   @@index([userId])
   @@index([streetId])
   @@index([sessionId])
@@ -320,12 +319,6 @@ model VisitedStreet {
   @@map("visited_streets")
 }
 
-
-//! merdge StreetVisitStat VisitedStreet
-//! merdge StreetVisitStat VisitedStreet
-//! merdge StreetVisitStat VisitedStreet
-//! merdge StreetVisitStat VisitedStreet
-//! merdge StreetVisitStat VisitedStreet
 
 // // New model to track street visit statistics
 // model StreetVisitStat {

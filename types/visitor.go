@@ -7,7 +7,7 @@ type VisitedStreet struct {
 	StreetName       string  `json:"street_name"`
 	EntryLat         float64 `json:"entry_lat,omitempty"`
 	EntryLng         float64 `json:"entry_lng,omitempty"`
-	Duration         *int    `json:"duration,omitempty"` // in seconds, can be nil
+		Duration         *int    `json:"duration,omitempty"` // in seconds, can be nil
 	VisitCount       int     `json:"visit_count"`        // total number of visits
 	FirstVisit       int64   `json:"first_visit"`        // unix timestamp
 	LastVisit        int64   `json:"last_visit"`         // unix timestamp
