@@ -86,133 +86,6 @@ func NewUserService(client *db.PrismaClient) *UserService {
 }
 
 
-
-// func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
-// 	fmt.Println("updating user")
-// 	fmt.Println(updates)
-
-// 	// Ensure user exists first
-// 	existingUser, err := s.client.User.FindUnique(
-// 		db.User.ID.Equals(clerkUserID),
-// 	).With(
-// 		db.User.Settings.Fetch(),
-// 	).Exec(ctx)
-// 	if err != nil {
-// 		if err == db.ErrNotFound {
-// 			// User doesn't exist, sync from Clerk first
-// 			user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
-// 			if syncErr != nil {
-// 				return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
-// 			}
-// 			existingUser = user
-// 		} else {
-// 			return nil, fmt.Errorf("error checking existing user: %w", err)
-// 		}
-// 	}
-
-// 	// Build update operations based on provided fields
-// 	updateOps := []db.UserSetParam{}
-
-// 	// Handle basic user fields
-// 	if updates.FirstName != nil {
-// 		updateOps = append(updateOps, db.User.FirstName.Set(*updates.FirstName))
-// 	}
-// 	if updates.LastName != nil {
-// 		updateOps = append(updateOps, db.User.LastName.Set(*updates.LastName))
-// 	}
-// 	if updates.UserName != nil {
-// 		updateOps = append(updateOps, db.User.UserName.Set(*updates.UserName))
-// 	}
-// 	if updates.ImageURL != nil {
-// 		updateOps = append(updateOps, db.User.ImageURL.Set(*updates.ImageURL))
-// 	}
-// 	if updates.CompletedTutorial != nil {
-// 		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
-// 	}
-// 	if updates.IsLocationTrackingEnabled != nil {
-// 		updateOps = append(updateOps, db.User.CompletedTutorial.Set(*updates.CompletedTutorial))
-// 	}
-
-// 	// Handle city data - ONLY use SelectedCity OR individual fields, not both
-// 	var cityNameForStats *string
-
-// 	if updates.SelectedCity != nil {
-// 		// Use SelectedCity object (preferred approach for frontend)
-// 		city := updates.SelectedCity
-// 		updateOps = append(updateOps, db.User.CityName.Set(city.Name))
-// 		updateOps = append(updateOps, db.User.CityCountry.Set(city.Country))
-// 		updateOps = append(updateOps, db.User.CityLat.Set(city.Lat))
-// 		updateOps = append(updateOps, db.User.CityLng.Set(city.Lon))
-// 		updateOps = append(updateOps, db.User.CityDisplayName.Set(city.DisplayName))
-
-// 		// Update the legacy city field for backward compatibility
-// 		updateOps = append(updateOps, db.User.City.Set(city.Name))
-
-// 		// Handle optional state
-// 		if city.State != nil {
-// 			updateOps = append(updateOps, db.User.CityState.Set(*city.State))
-// 		}
-
-// 		cityNameForStats = &city.Name
-
-// 	} else {
-// 		// Use individual fields (fallback approach)
-// 		// Only process individual fields if SelectedCity is NOT provided
-
-// 		if updates.CityName != nil {
-// 			updateOps = append(updateOps, db.User.CityName.Set(*updates.CityName))
-// 			// Update legacy city field for backward compatibility
-// 			updateOps = append(updateOps, db.User.City.Set(*updates.CityName))
-// 			cityNameForStats = updates.CityName
-// 		}
-// 		if updates.CityCountry != nil {
-// 			updateOps = append(updateOps, db.User.CityCountry.Set(*updates.CityCountry))
-// 		}
-// 		if updates.CityState != nil {
-// 			updateOps = append(updateOps, db.User.CityState.Set(*updates.CityState))
-// 		}
-// 		if updates.CityCoords != nil {
-// 			updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
-// 			updateOps = append(updateOps, db.User.CityLng.Set(updates.CityCoords.Lng))
-// 		}
-// 	}
-
-// 	// If no updates provided, return existing user
-// 	if len(updateOps) == 0 {
-// 		return existingUser, nil
-// 	}
-
-// 	// Perform the update
-// 	updatedUser, err := s.client.User.FindUnique(
-// 		db.User.ID.Equals(clerkUserID),
-// 	).Update(updateOps...).Exec(ctx)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to update user: %w", err)
-// 	}
-
-// 	// Queue city data processing instead of doing it synchronously
-// 	if cityNameForStats != nil {
-// 		select {
-// 		case s.cityDataQueue <- CityDataProcessingRequest{
-// 			UserID: clerkUserID,
-// 			User:   updatedUser,
-// 		}:
-// 			fmt.Printf("Queued city data processing for user %s\n", clerkUserID)
-// 		default:
-// 			fmt.Printf("City data queue full, will retry city data processing for user %s\n", clerkUserID)
-// 		}
-
-// 		// Initialize CityStat synchronously (this should be fast)
-// 		err = s.initializeCityStatsIfNeeded(ctx, clerkUserID, cityNameForStats)
-// 		if err != nil {
-// 			// Log error but don't fail the user update
-// 			fmt.Printf("Warning: failed to initialize city stats for user %s: %v\n", clerkUserID, err)
-// 		}
-// 	}
-
-// 	return updatedUser, nil
-// }
-
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates UserUpdateRequest2 ) (*db.UserModel, error) {
 	fmt.Println("updating user")
 	fmt.Println(updates)
@@ -353,6 +226,9 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 
 	return updatedUser, nil
 }
+
+
+
 func (s *UserService) updateUserCityData(ctx context.Context, existingUser *db.UserModel) error {
 	cityName, ok := existingUser.City()
 	if !ok {

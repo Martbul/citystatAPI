@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"citystatAPI/middleware"
 	"citystatAPI/services"
@@ -73,13 +75,6 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// log.Printf("🔍 Current struct definition hash: %x", 
-   //  fmt.Sprintf("%+v", reflect.TypeOf(types.UserUpdateRequest{})))
-
-	// Check Content-Type
-	contentType := r.Header.Get("Content-Type")
-	log.Printf("Content-Type: %s", contentType)
-
 	// Read the body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -89,9 +84,6 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 	}
 	defer r.Body.Close()
 
-	log.Printf("Raw request body: %s", string(body))
-	log.Printf("Body length: %d", len(body))
-	
 	// Validate that we have a non-empty body
 	if len(body) == 0 {
 		log.Printf("❌ Empty request body")
@@ -124,14 +116,6 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	log.Printf("✅ Successfully decoded request: %+v", req)
-	log.Printf("FirstName: %s", req.FirstName)
-	log.Printf("LastName: %s", req.LastName)
-	log.Printf("UserName: %s", req.UserName)
-	log.Printf("ImageURL: %s", req.ImageURL)
-	log.Printf("CompletedTutorial: %v", req.CompletedTutorial)
-	log.Printf("IsLocationTrackingEnabled: %v", req.IsLocationTrackingEnabled)
-
 	if req.SelectedCity != nil {
 		log.Printf("SelectedCity: %+v", *req.SelectedCity)
 		log.Printf("  Name: %s", req.SelectedCity.Name)
@@ -144,16 +128,34 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		log.Printf("SelectedCity: nil")
 	}
 
-	// Update user with the provided data
-	user, err := h.userService.UpdateUserDetails(r.Context(), userID, req)
-	if err != nil {
-		log.Printf("❌ Service error: %v", err)
-		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// Respond immediately with success status
+	log.Printf("✅ Request validated, starting background processing for user %s", userID)
+	middleware.JSONResponse(w, map[string]interface{}{
+		"status": "processing",
+		"message": "User details update started",
+		"userId": userID,
+	}, http.StatusAccepted)
 
-	log.Printf("✅ User updated successfully")
-	middleware.JSONResponse(w, user, http.StatusOK)
+	// Process the update in the background
+	go func() {
+		// Create a new context for the background operation
+		// with a reasonable timeout to avoid hanging goroutines
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		log.Printf("🔄 Starting background update for user %s", userID)
+		
+		user, err := h.userService.UpdateUserDetails(ctx, userID, req)
+		if err != nil {
+			log.Printf("❌ Background update failed for user %s: %v", userID, err)
+			// You could implement retry logic here or send to a dead letter queue
+			return
+		}
+		
+		log.Printf("✅ Background update completed successfully for user %s", userID)
+		log.Printf("📊 Updated user data: ID=%s, Name=%s %s", 
+			user.ID, user.FirstName, user.LastName)
+	}()
 }
 
 // func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) {
@@ -162,73 +164,74 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 // 		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
 // 		return
 // 	}
-// 	    body, err := io.ReadAll(r.Body)
-// 		  if err != nil {
-//         log.Printf("Failed to read request body: %v", err)
-//         http.Error(w, `{"error":"Failed to read request body"}`, http.StatusBadRequest)
-//         return
-//     }
-    
-// 	    log.Printf("Raw request body: %s", string(body))
-// 	fmt.Println("+++++++++")
-
-// 	    r.Body = io.NopCloser(strings.NewReader(string(body)))
-
-// 	// Parse request body
-//     var req types.UserUpdateRequest
-
-// 	 decoder := json.NewDecoder(r.Body)
-//     decoder.DisallowUnknownFields() // This might be causing the issue!
-
-// 	 if err := decoder.Decode(&req); err != nil {
-//         log.Printf("❌ JSON decode error: %v", err)
-//         log.Printf("❌ Error type: %T", err)
-        
-//         // Try decoding without DisallowUnknownFields
-//         r.Body = io.NopCloser(strings.NewReader(string(body)))
-//         decoder2 := json.NewDecoder(r.Body)
-//         // Don't call DisallowUnknownFields() this time
-        
-//         if err2 := decoder2.Decode(&req); err2 != nil {
-//             log.Printf("❌ JSON decode error even without DisallowUnknownFields: %v", err2)
-//             http.Error(w, fmt.Sprintf(`{"error":"Invalid request body - JSON decode failed: %v"}`, err2), http.StatusBadRequest)
-//             return
-//         } else {
-//             log.Printf("⚠️ JSON decoded successfully WITHOUT DisallowUnknownFields - there might be extra fields")
-//         }
-//     }
-    
-//     log.Printf("✅ Successfully decoded request: %+v", req)
-//   log.Printf("FirstName: %s", req.FirstName)
-//     log.Printf("LastName: %s", req.LastName)
-//     log.Printf("UserName: %s", req.UserName)
-//     log.Printf("ImageURL: %s", req.ImageURL)
-//     log.Printf("CompletedTutorial: %v", req.CompletedTutorial)
-//     log.Printf("IsLocationTrackingEnabled: %v", req.IsLocationTrackingEnabled)
-    
-//     if req.SelectedCity != nil {
-//         log.Printf("SelectedCity: %+v", *req.SelectedCity)
-//         log.Printf("  Name: %s", req.SelectedCity.Name)
-//         log.Printf("  Country: %s", req.SelectedCity.Country)
-//         log.Printf("  State: %s", req.SelectedCity.State)
-//         log.Printf("  Lat: %f", req.SelectedCity.Lat)
-//         log.Printf("  Lng: %f", req.SelectedCity.Lng)
-//         log.Printf("  DisplayName: %s", req.SelectedCity.DisplayName)
-//     } else {
-//         log.Printf("SelectedCity: nil")
-//     }
 
 	
-// 	fmt.Println("------------updating user req body parsed")
+
+// 	// Read the body
+// 	body, err := io.ReadAll(r.Body)
+// 	if err != nil {
+// 		log.Printf("Failed to read request body: %v", err)
+// 		http.Error(w, `{"error":"Failed to read request body"}`, http.StatusBadRequest)
+// 		return
+// 	}
+// 	defer r.Body.Close()
+
+	
+// 	// Validate that we have a non-empty body
+// 	if len(body) == 0 {
+// 		log.Printf("❌ Empty request body")
+// 		http.Error(w, `{"error":"Empty request body"}`, http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	// Test if it's valid JSON first
+// 	var testJSON interface{}
+// 	if err := json.Unmarshal(body, &testJSON); err != nil {
+// 		log.Printf("❌ Invalid JSON: %v", err)
+// 		http.Error(w, fmt.Sprintf(`{"error":"Invalid JSON: %v"}`, err), http.StatusBadRequest)
+// 		return
+// 	}
+// 	log.Printf("✅ Valid JSON structure: %+v", testJSON)
+
+// 	// Parse into our struct
+// 	var req services.UserUpdateRequest2
+// 	if err := json.Unmarshal(body, &req); err != nil {
+// 		log.Printf("❌ Failed to unmarshal into UserUpdateRequest: %v", err)
+// 		log.Printf("❌ Error type: %T", err)
+		
+// 		// Let's see what specific field is causing issues
+// 		if typeErr, ok := err.(*json.UnmarshalTypeError); ok {
+// 			log.Printf("❌ Type error details - Field: %s, Expected: %s, Got: %s, Offset: %d", 
+// 				typeErr.Field, typeErr.Type, typeErr.Value, typeErr.Offset)
+// 		}
+		
+// 		http.Error(w, fmt.Sprintf(`{"error":"Failed to parse request: %v"}`, err), http.StatusBadRequest)
+// 		return
+// 	}
+
+
+
+// 	if req.SelectedCity != nil {
+// 		log.Printf("SelectedCity: %+v", *req.SelectedCity)
+// 		log.Printf("  Name: %s", req.SelectedCity.Name)
+// 		log.Printf("  Country: %s", req.SelectedCity.Country)
+// 		log.Printf("  State: %s", req.SelectedCity.State)
+// 		log.Printf("  Lat: %f", req.SelectedCity.Lat)
+// 		log.Printf("  Lng: %f", req.SelectedCity.Lng)
+// 		log.Printf("  DisplayName: %s", req.SelectedCity.DisplayName)
+// 	} else {
+// 		log.Printf("SelectedCity: nil")
+// 	}
 
 // 	// Update user with the provided data
 // 	user, err := h.userService.UpdateUserDetails(r.Context(), userID, req)
 // 	if err != nil {
+// 		log.Printf("❌ Service error: %v", err)
 // 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
 // 		return
 // 	}
-// 	fmt.Println("user updated successfuly")
 
+// 	log.Printf("✅ User updated successfully")
 // 	middleware.JSONResponse(w, user, http.StatusOK)
 // }
 
