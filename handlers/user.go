@@ -50,24 +50,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	middleware.JSONResponse(w, user, http.StatusOK)
 }
 
-type UserUpdateRequest2 struct {
-    FirstName                 string    `json:"firstName,omitempty"`
-    LastName                  string    `json:"lastName,omitempty"`
-    UserName                  string    `json:"userName,omitempty"`
-    ImageURL                  string    `json:"imageUrl,omitempty"`
-    CompletedTutorial         bool      `json:"completedTutorial,omitempty"`
-    IsLocationTrackingEnabled bool      `json:"isLocationTrackingEnabled,omitempty"`
-    SelectedCity              *CityData2 `json:"selectedCity,omitempty"`
-}
 
-type CityData2 struct {
-    Name        string  `json:"name"`
-    Country     string  `json:"country"`
-    State       string  `json:"state"`
-    Lat         float64 `json:"lat"`
-    Lng         float64 `json:"lng"`
-    DisplayName string  `json:"display_name"`
-}
 
 //! after user selects its city calculate its street count, its street area, 
 // UpdateUserDetails godoc
@@ -126,7 +109,7 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 	log.Printf("✅ Valid JSON structure: %+v", testJSON)
 
 	// Parse into our struct
-	var req UserUpdateRequest2
+	var req services.UserUpdateRequest2
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.Printf("❌ Failed to unmarshal into UserUpdateRequest: %v", err)
 		log.Printf("❌ Error type: %T", err)

@@ -15,6 +15,26 @@ import (
 	"github.com/clerk/clerk-sdk-go/v2/user"
 )
 
+
+type UserUpdateRequest2 struct {
+    FirstName                 string    `json:"firstName,omitempty"`
+    LastName                  string    `json:"lastName,omitempty"`
+    UserName                  string    `json:"userName,omitempty"`
+    ImageURL                  string    `json:"imageUrl,omitempty"`
+    CompletedTutorial         bool      `json:"completedTutorial,omitempty"`
+    IsLocationTrackingEnabled bool      `json:"isLocationTrackingEnabled,omitempty"`
+    SelectedCity              *CityData2 `json:"selectedCity,omitempty"`
+}
+
+type CityData2 struct {
+    Name        string  `json:"name"`
+    Country     string  `json:"country"`
+    State       string  `json:"state"`
+    Lat         float64 `json:"lat"`
+    Lng         float64 `json:"lng"`
+    DisplayName string  `json:"display_name"`
+}
+
 type CityDataProcessingRequest struct {
 	UserID string
 	User   *db.UserModel
@@ -193,7 +213,7 @@ func NewUserService(client *db.PrismaClient) *UserService {
 // 	return updatedUser, nil
 // }
 
-func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates types.UserUpdateRequest) (*db.UserModel, error) {
+func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates UserUpdateRequest2 ) (*db.UserModel, error) {
 	fmt.Println("updating user")
 	fmt.Println(updates)
 
