@@ -72,6 +72,9 @@ func (h *UserHandler) UpdateUserDetails(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	log.Printf("🔍 Current struct definition hash: %x", 
+    fmt.Sprintf("%+v", reflect.TypeOf(types.UserUpdateRequest{})))
+
 	// Check Content-Type
 	contentType := r.Header.Get("Content-Type")
 	log.Printf("Content-Type: %s", contentType)
