@@ -219,7 +219,7 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 	// Build update operations based on provided fields
 	updateOps := []db.UserSetParam{}
 
-	// Handle basic user fields - NO MORE POINTERS
+	// Handle basic user fields
 	if updates.FirstName != "" {
 		updateOps = append(updateOps, db.User.FirstName.Set(updates.FirstName))
 	}
@@ -238,12 +238,13 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 		updateOps = append(updateOps, db.User.CompletedTutorial.Set(updates.CompletedTutorial))
 	}
 
-	// Handle city data - ONLY use SelectedCity OR individual fields, not both
+	// Handle city data - simplified to only use SelectedCity
 	var cityNameForStats *string
 
 	if updates.SelectedCity != nil {
-		// Use SelectedCity object (preferred approach for frontend)
 		city := updates.SelectedCity
+		
+		// Update all city-related fields
 		updateOps = append(updateOps, db.User.CityName.Set(city.Name))
 		updateOps = append(updateOps, db.User.CityCountry.Set(city.Country))
 		updateOps = append(updateOps, db.User.CityLat.Set(city.Lat))
@@ -253,33 +254,15 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 		// Update the legacy city field for backward compatibility
 		updateOps = append(updateOps, db.User.City.Set(city.Name))
 
-		// Handle state (it's a regular string, not pointer)
+		// Handle state
 		if city.State != "" {
 			updateOps = append(updateOps, db.User.CityState.Set(city.State))
 		}
 
 		cityNameForStats = &city.Name
-
-	} else {
-		// Use individual fields (fallback approach)
-		// Only process individual fields if SelectedCity is NOT provided
-
-		if updates.CityName != "" {
-			updateOps = append(updateOps, db.User.CityName.Set(updates.CityName))
-			// Update legacy city field for backward compatibility
-			updateOps = append(updateOps, db.User.City.Set(updates.CityName))
-			cityNameForStats = &updates.CityName
-		}
-		if updates.CityCountry != "" {
-			updateOps = append(updateOps, db.User.CityCountry.Set(updates.CityCountry))
-		}
-		if updates.CityState != "" {
-			updateOps = append(updateOps, db.User.CityState.Set(updates.CityState))
-		}
-		if updates.CityCoords != nil {
-			updateOps = append(updateOps, db.User.CityLat.Set(updates.CityCoords.Lat))
-			updateOps = append(updateOps, db.User.CityLng.Set(updates.CityCoords.Lng))
-		}
+		
+		fmt.Printf("City data will be updated: %s, %s, %s (%.6f, %.6f)\n", 
+			city.Name, city.Country, city.State, city.Lat, city.Lng)
 	}
 
 	// Handle location tracking permission update in Settings
@@ -350,7 +333,6 @@ func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string,
 
 	return updatedUser, nil
 }
-
 func (s *UserService) updateUserCityData(ctx context.Context, existingUser *db.UserModel) error {
 	cityName, ok := existingUser.City()
 	if !ok {
