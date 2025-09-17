@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	"citystatAPI/prisma/db"
@@ -919,6 +921,14 @@ func getBoolPointer(data map[string]interface{}, key string) *bool {
 	return nil
 }
 
+
+
+// UserSearchResultWithScore represents a search result with ranking score
+type UserSearchResultWithScore struct {
+	types.UserSearchResult
+	Score int // Higher score = better match
+}
+
 func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username string) ([]types.UserSearchResult, error) {
 	// Get current user's friends to check friend status
 	currentUserFriends, err := s.client.Friend.FindMany(
@@ -934,36 +944,245 @@ func (s *UserService) SearchUsers(ctx context.Context, currentUserID, username s
 		friendMap[friend.FriendID] = true
 	}
 
-	// Search for users by username (case-insensitive partial matching)
+	// Normalize search term
+	searchTerm := strings.ToLower(strings.TrimSpace(username))
+	if searchTerm == "" {
+		return []types.UserSearchResult{}, nil
+	}
+	
+	// Search across username, first name, and last name fields
+	// Using OR conditions to cast a wider net for fuzzy matching
 	users, err := s.client.User.FindMany(
 		db.User.And(
-			db.User.UserName.Contains(username),
+			db.User.Or(
+				// Search in username field
+				db.User.UserName.Contains(username),
+				// Search in first name field
+				db.User.FirstName.Contains(username),
+				// Search in last name field  
+				db.User.LastName.Contains(username),
+				// Search for cases where search term might match "FirstName LastName"
+				db.User.Or(
+					db.User.And(
+						db.User.FirstName.StartsWith(strings.Split(username, " ")[0]),
+						db.User.LastName.StartsWith(func() string {
+							parts := strings.Split(username, " ")
+							if len(parts) > 1 {
+								return parts[1]
+							}
+							return ""
+						}()),
+					),
+				),
+			),
 			db.User.ID.Not(currentUserID), // Exclude current user
 		),
-	).Take(10).Exec(ctx) // Limit to 10 results
+	).Take(100).Exec(ctx) // Get more results for better ranking
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to search users: %w", err)
 	}
 
-	// Convert to response format with friend status
-	results := make([]types.UserSearchResult, len(users))
-	for i, user := range users {
+	// Score and rank results
+	var scoredResults []UserSearchResultWithScore
+	for _, user := range users {
 		firstName, _ := user.FirstName()
 		lastName, _ := user.LastName()
 		userName, _ := user.UserName()
 		imageURL := user.ImageURL
-		results[i] = types.UserSearchResult{
-			ID:        user.ID,
-			UserName:  &userName,
-			FirstName: &firstName,
-			LastName:  &lastName,
-			ImageURL:  &imageURL,
-			IsFriend:  friendMap[user.ID],
+
+		// Calculate match score across all searchable fields
+		score := calculateMultiFieldMatchScore(searchTerm, userName, firstName, lastName)
+		
+		// Only include results with a reasonable score
+		if score > 0 {
+			result := UserSearchResultWithScore{
+				UserSearchResult: types.UserSearchResult{
+					ID:        user.ID,
+					UserName:  &userName,
+					FirstName: &firstName,
+					LastName:  &lastName,
+					ImageURL:  &imageURL,
+					IsFriend:  friendMap[user.ID],
+				},
+				Score: score,
+			}
+			scoredResults = append(scoredResults, result)
 		}
 	}
 
+	// Sort by score (highest first), then by username for consistency
+	sort.Slice(scoredResults, func(i, j int) bool {
+		if scoredResults[i].Score != scoredResults[j].Score {
+			return scoredResults[i].Score > scoredResults[j].Score
+		}
+		// Secondary sort by username for consistent ordering
+		return strings.ToLower(*scoredResults[i].UserName) < strings.ToLower(*scoredResults[j].UserName)
+	})
+
+	// Convert back to regular results and limit to 10
+	results := make([]types.UserSearchResult, 0, 10)
+	for i, scored := range scoredResults {
+		if i >= 10 {
+			break
+		}
+		results = append(results, scored.UserSearchResult)
+	}
+
 	return results, nil
+}
+
+// calculateMultiFieldMatchScore returns a score for how well the user matches the search term
+// Searches across username, first name, last name, and full name combinations
+func calculateMultiFieldMatchScore(searchTerm, userName, firstName, lastName string) int {
+	if searchTerm == "" {
+		return 0
+	}
+
+	score := 0
+	searchLower := strings.ToLower(searchTerm)
+	userNameLower := strings.ToLower(userName)
+	firstNameLower := strings.ToLower(firstName)
+	lastNameLower := strings.ToLower(lastName)
+	fullNameLower := strings.ToLower(strings.TrimSpace(firstName + " " + lastName))
+
+	// USERNAME MATCHING (highest priority)
+	if userNameLower == searchLower {
+		score += 1000 // Exact username match
+	} else if strings.HasPrefix(userNameLower, searchLower) {
+		score += 800 // Username starts with search
+	} else if strings.Contains(userNameLower, searchLower) {
+		score += 600 // Username contains search
+	}
+
+	// FIRST NAME MATCHING
+	if firstNameLower == searchLower {
+		score += 500 // Exact first name match
+	} else if strings.HasPrefix(firstNameLower, searchLower) {
+		score += 400 // First name starts with search
+	} else if strings.Contains(firstNameLower, searchLower) {
+		score += 300 // First name contains search
+	}
+
+	// LAST NAME MATCHING
+	if lastNameLower == searchLower {
+		score += 500 // Exact last name match
+	} else if strings.HasPrefix(lastNameLower, searchLower) {
+		score += 400 // Last name starts with search
+	} else if strings.Contains(lastNameLower, searchLower) {
+		score += 300 // Last name contains search
+	}
+
+	// FULL NAME MATCHING (for searches like "John Doe")
+	if fullNameLower == searchLower {
+		score += 900 // Exact full name match
+	} else if strings.HasPrefix(fullNameLower, searchLower) {
+		score += 700 // Full name starts with search
+	} else if strings.Contains(fullNameLower, searchLower) {
+		score += 500 // Full name contains search
+	}
+
+	// Handle partial full name searches (e.g., "John D" matching "John Doe")
+	searchParts := strings.Fields(searchLower)
+	if len(searchParts) >= 2 {
+		firstPart := searchParts[0]
+		secondPart := searchParts[1]
+		
+		if strings.HasPrefix(firstNameLower, firstPart) && strings.HasPrefix(lastNameLower, secondPart) {
+			score += 850 // Both first and last name match parts
+		}
+	}
+
+	// FUZZY MATCHING BONUSES
+	// Bonus for similar length usernames
+	usernameLengthDiff := abs(len(searchLower) - len(userNameLower))
+	if usernameLengthDiff <= 2 && len(searchLower) > 2 {
+		score += 100 - (usernameLengthDiff * 20)
+	}
+
+	// Levenshtein distance for username (for typo tolerance)
+	if score < 600 && len(searchLower) > 2 { // Only for non-obvious matches
+		distance := levenshteinDistance(searchLower, userNameLower)
+		maxLen := max(len(searchLower), len(userNameLower))
+		
+		if maxLen > 0 {
+			similarity := float64(maxLen-distance) / float64(maxLen)
+			if similarity > 0.7 { // 70% similarity threshold
+				score += int(similarity * 150)
+			}
+		}
+	}
+
+	// Bonus for friends (social relevance)
+	// Note: This would need to be passed in if you want to prioritize friends
+	// if isFriend {
+	//     score += 50
+	// }
+
+	return score
+}
+
+// Helper functions
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// levenshteinDistance calculates the Levenshtein distance between two strings
+func levenshteinDistance(s1, s2 string) int {
+	if len(s1) == 0 {
+		return len(s2)
+	}
+	if len(s2) == 0 {
+		return len(s1)
+	}
+
+	matrix := make([][]int, len(s1)+1)
+	for i := range matrix {
+		matrix[i] = make([]int, len(s2)+1)
+	}
+
+	for i := 0; i <= len(s1); i++ {
+		matrix[i][0] = i
+	}
+	for j := 0; j <= len(s2); j++ {
+		matrix[0][j] = j
+	}
+
+	for i := 1; i <= len(s1); i++ {
+		for j := 1; j <= len(s2); j++ {
+			cost := 0
+			if s1[i-1] != s2[j-1] {
+				cost = 1
+			}
+
+			matrix[i][j] = min3(
+				matrix[i-1][j]+1,      // deletion
+				matrix[i][j-1]+1,      // insertion
+				matrix[i-1][j-1]+cost, // substitution
+			)
+		}
+	}
+
+	return matrix[len(s1)][len(s2)]
+}
+
+func min3(a, b, c int) int {
+	if a <= b && a <= c {
+		return a
+	} else if b <= c {
+		return b
+	}
+	return c
 }
 
 func (s *UserService) GetUsersSameCity(ctx context.Context, clerkUserID string) ([]types.UserSearchResult, error) {
