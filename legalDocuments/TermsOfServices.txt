@@ -1,0 +1,70 @@
+Terms of Service
+
+Effective Date: [18.09.2025]
+
+These Terms of Service (“Terms”) constitute a legally binding agreement between you (“User,” “you,” or “your”) and CityStat (“Company,” “we,” “us,” or “our”) governing your access to and use of the CityStat mobile application (the “App”) and any related services (collectively, the “Services”). By creating an account, accessing, or using the Services, you agree to be bound by these Terms. If you do not agree, you must not use the Services.
+
+1. Eligibility
+
+The Services are available to individuals of all ages worldwide. By using the Services, you represent and warrant that you have the legal capacity to enter into this agreement under the laws of your jurisdiction.
+
+2. Accounts
+
+To access certain features of the Services, you must create an account. You agree to:
+
+Provide accurate, complete, and current information during registration.
+
+Maintain the security and confidentiality of your account credentials.
+
+Notify us immediately of any unauthorized use or breach of security.
+
+You are responsible for all activities that occur under your account.
+
+3. Acceptable Use
+
+You agree not to:
+
+Access, use, or attempt to use the Services for any unlawful purpose.
+
+Interfere with or disrupt the operation of the Services.
+
+Reverse-engineer, decompile, disassemble, or otherwise attempt to derive the source code of the App.
+
+Circumvent, disable, or tamper with any security features.
+
+Manipulate, falsify, or attempt to distort the statistical data provided by the Services.
+
+We reserve the right to investigate violations of these Terms and take any action we deem appropriate, including account suspension or termination.
+
+4. Ownership and Intellectual Property
+
+All rights, title, and interest in and to the Services, including but not limited to software, designs, text, graphics, data, and other content, are owned by CityStat or its licensors. No rights or licenses are granted to you except as expressly set forth in these Terms.
+
+5. Accuracy of Information
+
+The statistical data provided through the Services is intended to be informative and generally accurate; however, CityStat does not warrant that such data will be free from errors or inaccuracies. You acknowledge and agree that data may be incomplete, outdated, or incorrect.
+
+6. Modifications to the Services and Terms
+
+We may modify, update, or discontinue the Services at any time, with or without notice. We may also revise these Terms from time to time. If we make material changes, we will provide notice by posting the updated Terms within the App or through other reasonable means. Your continued use of the Services after such changes constitutes acceptance of the revised Terms.
+
+7. Termination
+
+We may, at our sole discretion, suspend or terminate your access to the Services, with or without notice, for any reason, including violation of these Terms. Upon termination, your right to use the Services will cease immediately.
+
+8. Limitation of Liability
+
+To the maximum extent permitted by applicable law, CityStat shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of data, loss of profits, or interruption of service, arising out of or related to your use of or inability to use the Services.
+
+9. Governing Law
+
+These Terms shall be governed by and construed in accordance with the laws of Bulgaria. You agree to submit to the exclusive jurisdiction of the courts located in Sofia, Bulgaria, for any dispute arising out of or relating to these Terms or the Services.
+
+10. Severability and Entire Agreement
+
+If any provision of these Terms is found to be invalid, illegal, or unenforceable, the remaining provisions shall remain in full force and effect. These Terms constitute the entire agreement between you and CityStat concerning the subject matter herein and supersede any prior or contemporaneous agreements, communications, and understandings, whether written or oral.
+
+11. Contact Information
+
+For questions regarding these Terms, you may contact us at:
+[Insert Contact Email or Support Link]

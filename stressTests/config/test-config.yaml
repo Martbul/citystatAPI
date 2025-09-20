@@ -1,0 +1,67 @@
+config:
+  target: 'http://localhost:3333'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 300
+      arrivalRate: 20
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 50
+      name: "Spike test"
+  variables:
+    baseUrl: "http://localhost:3333"
+  processor: "./processors/auth-processor.js"
+
+scenarios:
+  - name: "User Journey"
+    weight: 60
+    flow:
+      - post:
+          url: "/api/user/sync"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_TOKEN }}"
+          capture:
+            - json: "$.userId"
+              as: "userId"
+      
+      - get:
+          url: "/api/user"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_TOKEN }}"
+      
+      - get:
+          url: "/api/friends/list"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_TOKEN }}"
+      
+      - get:
+          url: "/api/rank"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_TOKEN }}"
+
+  - name: "Analytics Heavy"
+    weight: 20
+    flow:
+      - get:
+          url: "/api/analytics/main2stats"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_TOKEN }}"
+      
+      - get:
+          url: "/api/analytics/mainRadarChartData"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_TOKEN }}"
+
+  - name: "Location Updates"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/visitor/streets"
+          headers:
+            Authorization: "Bearer {{ $processEnvironment.TEST_TOKEN }}"
+            Content-Type: "application/json"
+          json:
+            streets: ["Main St", "Oak Ave", "Pine Rd"]
+            timestamp: "{{ $timestamp }}"
