@@ -48,6 +48,28 @@ var (
     errorsTotal           metric.Int64Counter
 )
 
+
+//! leter add the rate-limiter to the metrics
+// var (
+//     // ... your existing metrics ...
+    
+//     RateLimitHitsTotal = promauto.NewCounterVec(
+//         prometheus.CounterOpts{
+//             Name: "rate_limit_hits_total",
+//             Help: "Total number of rate limit hits",
+//         },
+//         []string{"identifier_type", "endpoint", "user_tier"},
+//     )
+    
+//     ActiveRateLimitClients = promauto.NewGauge(
+//         prometheus.GaugeOpts{
+//             Name: "active_rate_limit_clients",
+//             Help: "Number of active rate limit clients",
+//         },
+//     )
+// )
+
+
 // InitAllMetrics initializes all metrics at once
 func InitAllMetrics() error {
     var err error

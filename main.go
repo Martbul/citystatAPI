@@ -16,26 +16,30 @@ import (
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/go-openapi/runtime/middleware"
+	"github.com/go-redis/redis/v8"
+	"golang.org/x/time/rate"
 
 	// "github.com/go-redis/redis/v8"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
 	"github.com/joho/godotenv"
-	    "go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 )
 
 var (
 	client *db.PrismaClient
 	// redisClient      *redis.Client
 	// rateLimiter      *appMiddleware.RateLimiter
-	userService      *services.UserService
-	settingsService  *services.SettingsService
-	friendService    *services.FriendService
-	visitorService   *services.VisitorService
-	rankService      *services.RankService
-	analyticsService *services.AnalyticsService
-	    telemetryShutdown telemetry.TelemetryShutdown
+	rateLimiter       *appMiddleware.RateLimiter
+	redisRateLimiter  *appMiddleware.RedisRateLimiter
+	userService       *services.UserService
+	settingsService   *services.SettingsService
+	friendService     *services.FriendService
+	visitorService    *services.VisitorService
+	rankService       *services.RankService
+	analyticsService  *services.AnalyticsService
+	telemetryShutdown telemetry.TelemetryShutdown
 )
 
 func init() {
@@ -43,24 +47,68 @@ func init() {
 		log.Println("No .env file found")
 	}
 
-	 telemetryConfig := telemetry.GetTelemetryConfigFromEnv()
-    var err error
-    telemetryShutdown, err = telemetry.InitTelemetry(telemetryConfig)
-    if err != nil {
-        log.Fatalf("Failed to initialize telemetry: %v", err)
-    }
+	telemetryConfig := telemetry.GetTelemetryConfigFromEnv()
+	var err error
+	telemetryShutdown, err = telemetry.InitTelemetry(telemetryConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize telemetry: %v", err)
+	}
 
-    // Initialize ALL metrics at once
-    if err := telemetry.InitAllMetrics(); err != nil {
-        log.Fatalf("Failed to initialize metrics: %v", err)
-    }
-    log.Println("✅ All metrics initialized")
+	// Initialize ALL metrics at once
+	if err := telemetry.InitAllMetrics(); err != nil {
+		log.Fatalf("Failed to initialize metrics: %v", err)
+	}
+	log.Println("✅ All metrics initialized")
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL environment variable is not set")
 	}
 	log.Printf("DATABASE_URL loaded: %s", dbURL[:50]+"...")
+
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "localhost:6379"
+	}
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:         redisURL,
+		Password:     os.Getenv("REDIS_PASSWORD"),
+		DB:           0,
+		DialTimeout:  10 * time.Second,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		PoolSize:     10,
+		PoolTimeout:  30 * time.Second,
+	})
+
+	// Test Redis connection
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Printf("Redis connection failed: %v. Using in-memory rate limiting", err)
+		// Use in-memory rate limiter as fallback
+		rateLimiterConfig := appMiddleware.RateLimitConfig{
+			DefaultRPS:   rate.Limit(100.0 / 60.0),
+			DefaultBurst: 20,
+			PremiumRPS:   rate.Limit(1000.0 / 60.0),
+			PremiumBurst: 50,
+		}
+		rateLimiter = appMiddleware.NewRateLimiter(rateLimiterConfig)
+		// appMiddleware.NewRateLimiter(rateLimiterConfig)
+	} else {
+		log.Println("Redis connected successfully")
+		// Use Redis rate limiter
+		// redisRateLimiter := appMiddleware.NewRedisRateLimiter(
+		redisRateLimiter = appMiddleware.NewRedisRateLimiter(
+			redisClient,
+			100,         // default limit per minute
+			1000,        // premium limit per minute
+			time.Minute, // window duration
+		)
+		// You'll need to modify your middleware usage accordingly
+	}
 
 	// Initialize Redis client
 	// redisURL := os.Getenv("REDIS_URL")
@@ -124,20 +172,20 @@ func init() {
 // }
 
 func main() {
-	 defer func() {
-        // Shutdown telemetry
-        if telemetryShutdown != nil {
-            ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-            defer cancel()
-            if err := telemetryShutdown(ctx); err != nil {
-                log.Printf("Failed to shutdown telemetry: %v", err)
-            }
-        }
-        
-        if err := client.Prisma.Disconnect(); err != nil {
-            log.Printf("Failed to disconnect from database: %v", err)
-        }
-    }()
+	defer func() {
+		// Shutdown telemetry
+		if telemetryShutdown != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := telemetryShutdown(ctx); err != nil {
+				log.Printf("Failed to shutdown telemetry: %v", err)
+			}
+		}
+
+		if err := client.Prisma.Disconnect(); err != nil {
+			log.Printf("Failed to disconnect from database: %v", err)
+		}
+	}()
 
 	tempLogger := hclog.Default()
 
@@ -153,34 +201,32 @@ func main() {
 
 	r := mux.NewRouter()
 
+	// Global middleware (applied to all routes)
+	r.Use(otelmux.Middleware("citystat-api"))
+	r.Use(appMiddleware.TelemetryMiddleware)
+	if redisRateLimiter != nil {
+		r.Use(appMiddleware.RedisRateLimitMiddleware(redisRateLimiter))
+	} else {
+		r.Use(appMiddleware.RateLimitMiddleware(rateLimiter))
 
-	 r.Use(otelmux.Middleware("citystat-api"))
-    
-    // Add custom telemetry middleware
-    r.Use(appMiddleware.TelemetryMiddleware)
+	}
 
-    // Setup metrics endpoint
-    telemetry.SetupMetricsEndpoint(r)
-
-	// Add rate limiting middleware BEFORE other middlewares
-	// r.Use(rateLimiter.SmartRateLimiter())
+	// Setup metrics endpoint
+	telemetry.SetupMetricsEndpoint(r)
 
 	// Public invite routes (no auth required but still rate limited)
 	r.HandleFunc("/invite", inviteHandler.ProcessInvite).Methods("GET")
 
 	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusOK)
-        w.Write([]byte(`{"status": "healthy", "service": "citystat-api"}`))
-    }).Methods("GET")
-
-	//! Add rate limit monitoring endpoint for admins
-	// r.HandleFunc("/admin/rate-limit/stats", getRateLimitStats).Methods("GET")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "healthy", "service": "citystat-api"}`))
+	}).Methods("GET")
 
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
 
-	// Protected routes
+	// Protected routes (auth + rate limiting)
 	protected := api.PathPrefix("").Subrouter()
 	protected.Use(appMiddleware.ClerkMiddleware)
 
@@ -230,7 +276,6 @@ func main() {
 	protected.HandleFunc("/analytics/mainRadarChartData", analiticsHandler.GetMainRadarChartData).Methods("GET")
 	protected.HandleFunc("/analytics/mainRadarChartData/detailed", analiticsHandler.GetMainRadarChartDataDetailed).Methods("GET")
 
-	
 	// Documents
 	//! privacy policy
 	//! terms of service
@@ -271,29 +316,29 @@ func main() {
 	}
 
 	go func() {
-        tempLogger.Info("Starting server with telemetry on port", "port", port)
-        err := server.ListenAndServe()
-        if err != nil && err != http.ErrServerClosed {
-            tempLogger.Error("Error starting server", "error", err)
-            os.Exit(1)
-        }
-    }()
+		tempLogger.Info("Starting server with telemetry on port", "port", port)
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			tempLogger.Error("Error starting server", "error", err)
+			os.Exit(1)
+		}
+	}()
 
 	sigChan := make(chan os.Signal, 1)
-    signal.Notify(sigChan, os.Interrupt)
-    signal.Notify(sigChan, os.Kill)
+	signal.Notify(sigChan, os.Interrupt)
+	signal.Notify(sigChan, os.Kill)
 
-    sig := <-sigChan
-    log.Println("Got signal:", sig)
+	sig := <-sigChan
+	log.Println("Got signal:", sig)
 
-    // Graceful shutdown with timeout
-    shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-    defer shutdownCancel()
+	// Graceful shutdown with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
 
-    // Shutdown HTTP server
-    if err := server.Shutdown(shutdownCtx); err != nil {
-        log.Printf("Server shutdown error: %v", err)
-    }
+	// Shutdown HTTP server
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Server shutdown error: %v", err)
+	}
 
-    log.Println("Server shutdown complete")
+	log.Println("Server shutdown complete")
 }
