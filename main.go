@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	appHandlers "citystatAPI/handlers"
@@ -71,52 +74,37 @@ func init() {
 		redisURL = "localhost:6379"
 	}
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:         redisURL,
-		Password:     os.Getenv("REDIS_PASSWORD"),
+	u, err := url.Parse(redisURL)
+	if err != nil {
+		log.Fatalf("❌ Invalid REDIS_URL: %v", err)
+	}
+
+	addr := u.Host
+	password := ""
+	if u.User != nil {
+		password, _ = u.User.Password()
+	}
+
+	useTLS := strings.HasPrefix(redisURL, "rediss://")
+
+	opts := &redis.Options{
+		Addr:         addr,
+		Password:     password,
 		DB:           0,
 		DialTimeout:  10 * time.Second,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		PoolSize:     10,
 		PoolTimeout:  30 * time.Second,
-	})
-
-	// Test Redis connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := redisClient.Ping(ctx).Err(); err != nil {
-		log.Printf("Redis connection failed: %v. Using in-memory rate limiting", err)
-		// Use in-memory rate limiter as fallback
-		rateLimiterConfig := appMiddleware.RateLimitConfig{
-			DefaultRPS:   rate.Limit(100.0 / 60.0),
-			DefaultBurst: 20,
-			PremiumRPS:   rate.Limit(1000.0 / 60.0),
-			PremiumBurst: 50,
-		}
-		rateLimiter = appMiddleware.NewRateLimiter(rateLimiterConfig)
-		// appMiddleware.NewRateLimiter(rateLimiterConfig)
-	} else {
-		log.Println("Redis connected successfully")
-		// Use Redis rate limiter
-		// redisRateLimiter := appMiddleware.NewRedisRateLimiter(
-		redisRateLimiter = appMiddleware.NewRedisRateLimiter(
-			redisClient,
-			100,         // default limit per minute
-			1000,        // premium limit per minute
-			time.Minute, // window duration
-		)
-		// You'll need to modify your middleware usage accordingly
 	}
 
-	// Initialize Redis client
-	// redisURL := os.Getenv("REDIS_URL")
-	// if redisURL == "" {
-	// 	redisURL = "localhost:6379" // Default for development
-	// }
+	if useTLS {
+		opts.TLSConfig = &tls.Config{InsecureSkipVerify: false}
+	}
 
-	// redisClient = redis.NewClient(&redis.Options{
+	redisClient := redis.NewClient(opts)
+
+	// redisClient := redis.NewClient(&redis.Options{
 	// 	Addr:         redisURL,
 	// 	Password:     os.Getenv("REDIS_PASSWORD"),
 	// 	DB:           0,
@@ -128,14 +116,28 @@ func init() {
 	// })
 
 	// Test Redis connection
-	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	// defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	// if err := redisClient.Ping(ctx).Err(); err != nil {
-	// 	log.Printf("Warning: Redis connection failed: %v. Rate limiting will use fallback mode.", err)
-	// } else {
-	// 	log.Println("Redis connected successfully")
-	// }
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		log.Printf("Redis connection failed: %v. Using in-memory rate limiting", err)
+		rateLimiterConfig := appMiddleware.RateLimitConfig{
+			DefaultRPS:   rate.Limit(100.0 / 60.0),
+			DefaultBurst: 20,
+			PremiumRPS:   rate.Limit(1000.0 / 60.0),
+			PremiumBurst: 50,
+		}
+		rateLimiter = appMiddleware.NewRateLimiter(rateLimiterConfig)
+	} else {
+		log.Println("Redis connected successfully")
+		// Use Redis rate limiter
+		redisRateLimiter = appMiddleware.NewRedisRateLimiter(
+			redisClient,
+			100,         // default limit per minute
+			1000,        // premium limit per minute
+			time.Minute, // window duration
+		)
+	}
 
 	clerk.SetKey(os.Getenv("CLERK_SECRET_KEY"))
 
@@ -144,32 +146,14 @@ func init() {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
-	// Initialize services
+	// Services
 	userService = services.NewUserService(client)
 	settingsService = services.NewSettingsService(client)
 	friendService = services.NewFriendService(client)
 	rankService = services.NewRankService(client)
 	visitorService = services.NewVisitorService(client, rankService)
 	analyticsService = services.NewAnalyticsService(client)
-
-	// Initialize rate limiter
-	// rateLimiter = appMiddleware.NewRateLimiter(redisClient)
-
-	// Set up user tiers (you'd typically load this from your database)
-	// setupUserTiers()
-
 }
-
-// func setupUserTiers() {
-// 	// Example: Set user tiers based on your business logic
-// 	// In production, you'd fetch this from your database
-
-// 	// You could have a service method to check user subscription status
-// 	// rateLimiter.SetUserTier("premium_user_id", appMiddleware.TierPremium)
-// 	// rateLimiter.SetUserTier("enterprise_user_id", appMiddleware.TierEnterprise)
-
-// 	log.Println("User tiers initialized")
-// }
 
 func main() {
 	defer func() {
