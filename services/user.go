@@ -15,8 +15,12 @@ import (
 	"citystatAPI/types"
 
 	"github.com/clerk/clerk-sdk-go/v2/user"
+	"go.opentelemetry.io/otel"
+    "go.opentelemetry.io/otel/attribute"
 )
 
+
+var userServiceTracer = otel.Tracer("citystat-api/services/user")
 
 type UserUpdateRequest2 struct {
     FirstName                 string    `json:"firstName,omitempty"`
@@ -91,25 +95,44 @@ func NewUserService(client *db.PrismaClient) *UserService {
 func (s *UserService) UpdateUserDetails(ctx context.Context, clerkUserID string, updates UserUpdateRequest2 ) (*db.UserModel, error) {
 	fmt.Println("updating user")
 	fmt.Println(updates)
+ ctx, span := userServiceTracer.Start(ctx, "UpdateUserDetails")
+    defer span.End()
+    
+    span.SetAttributes(
+        attribute.String("user.id", clerkUserID),
+        attribute.Bool("has_city_update", updates.SelectedCity != nil),
+    )
 
-	// Ensure user exists first
-	existingUser, err := s.client.User.FindUnique(
-		db.User.ID.Equals(clerkUserID),
-	).With(
-		db.User.Settings.Fetch(),
-	).Exec(ctx)
-	if err != nil {
-		if err == db.ErrNotFound {
-			// User doesn't exist, sync from Clerk first
-			user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
-			if syncErr != nil {
-				return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
-			}
-			existingUser = user
-		} else {
-			return nil, fmt.Errorf("error checking existing user: %w", err)
-		}
-	}
+    // Ensure user exists first
+    ctx, dbSpan := userServiceTracer.Start(ctx, "db.find_user")
+    existingUser, err := s.client.User.FindUnique(
+        db.User.ID.Equals(clerkUserID),
+    ).With(
+        db.User.Settings.Fetch(),
+    ).Exec(ctx)
+    dbSpan.End()
+
+ if err != nil {
+        if err == db.ErrNotFound {
+            // User doesn't exist, sync from Clerk first
+            span.SetAttributes(attribute.Bool("user.needs_sync", true))
+            user, syncErr := s.SyncUserFromClerk(ctx, clerkUserID)
+            if syncErr != nil {
+                span.SetAttributes(
+                    attribute.Bool("error", true),
+                    attribute.String("error.message", syncErr.Error()),
+                )
+                return nil, fmt.Errorf("failed to sync user from Clerk: %w", syncErr)
+            }
+            existingUser = user
+        } else {
+            span.SetAttributes(
+                attribute.Bool("error", true),
+                attribute.String("error.message", err.Error()),
+            )
+            return nil, fmt.Errorf("error checking existing user: %w", err)
+        }
+    }
 
 	// Build update operations based on provided fields
 	updateOps := []db.UserSetParam{}

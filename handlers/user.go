@@ -10,9 +10,57 @@ import (
 
 	"citystatAPI/middleware"
 	"citystatAPI/services"
+	"citystatAPI/telemetry"
 	"citystatAPI/types"
 	"citystatAPI/utils"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
+
+
+var userTracer = otel.Tracer("citystat-api/handlers/user")
+
+// var (
+//     userTracer = otel.Tracer("citystat-api/handlers/user")
+//     userMeter  = otel.Meter("citystat-api/handlers/user")
+    
+//     // User-specific metrics
+//     userOperationsTotal metric.Int64Counter
+//     userSearchDuration  metric.Float64Histogram
+//     cityDataProcessingDuration metric.Float64Histogram
+// )
+
+// func init() {
+//     var err error
+    
+//     userOperationsTotal, err = userMeter.Int64Counter(
+//         "user_operations_total",
+//         metric.WithDescription("Total number of user operations"),
+//     )
+//     if err != nil {
+//         panic(err)
+//     }
+    
+//     userSearchDuration, err = userMeter.Float64Histogram(
+//         "user_search_duration_seconds",
+//         metric.WithDescription("Duration of user search operations"),
+//         metric.WithUnit("s"),
+//     )
+//     if err != nil {
+//         panic(err)
+//     }
+    
+//     cityDataProcessingDuration, err = userMeter.Float64Histogram(
+//         "city_data_processing_duration_seconds",
+//         metric.WithDescription("Duration of city data processing"),
+//         metric.WithUnit("s"),
+//     )
+//     if err != nil {
+//         panic(err)
+//     }
+// }
+
 
 type UserHandler struct {
 	userService *services.UserService
@@ -35,20 +83,61 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 // @Failure      500  {object}  map[string]string
 // @Router       /user [get]
 func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r)
-	if !ok {
-		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
-		return
-	}
+    // Use the context from the request (already has telemetry from middleware)
+    ctx := r.Context()
+    
+    // Create a span for this specific operation
+    ctx, span := userTracer.Start(ctx, "GetProfile")
+    defer span.End()
+    
+    // Record user operation using the telemetry package
+    telemetry.RecordUserOperation(ctx, "get_profile")
+    
+    userID, ok := middleware.GetUserID(r)
+    if !ok {
+        span.SetAttributes(
+            attribute.Bool("error", true),
+            attribute.String("error.type", "no_user_id"),
+        )
+        // Record error using telemetry package
+        telemetry.RecordError(ctx, "no_user_id", "get_profile")
+        middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+        return
+    }
 
-	user, err := h.userService.GetOrCreateUser(r.Context(), userID)
-	if err != nil {
-		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+    span.SetAttributes(attribute.String("user.id", userID))
 
-	middleware.JSONResponse(w, user, http.StatusOK)
+    user, err := h.userService.GetOrCreateUser(ctx, userID)
+    if err != nil {
+        span.SetAttributes(
+            attribute.Bool("error", true),
+            attribute.String("error.message", err.Error()),
+        )
+        // Use the proper error recording function
+        telemetry.RecordErrorWithTrace(ctx, err, "get_profile")
+        middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    span.SetAttributes(attribute.Bool("success", true))
+    middleware.JSONResponse(w, user, http.StatusOK)
 }
+
+// func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
+// 	userID, ok := middleware.GetUserID(r)
+// 	if !ok {
+// 		middleware.ErrorResponse(w, "User ID not found in context", http.StatusUnauthorized)
+// 		return
+// 	}
+
+// 	user, err := h.userService.GetOrCreateUser(r.Context(), userID)
+// 	if err != nil {
+// 		middleware.ErrorResponse(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	middleware.JSONResponse(w, user, http.StatusOK)
+// }
 
 
 

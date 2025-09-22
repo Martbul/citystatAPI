@@ -12,14 +12,17 @@ import (
 	appMiddleware "citystatAPI/middleware"
 	"citystatAPI/prisma/db"
 	"citystatAPI/services"
+	"citystatAPI/telemetry"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/go-openapi/runtime/middleware"
+
 	// "github.com/go-redis/redis/v8"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
 	"github.com/joho/godotenv"
+	    "go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 )
 
 var (
@@ -32,12 +35,26 @@ var (
 	visitorService   *services.VisitorService
 	rankService      *services.RankService
 	analyticsService *services.AnalyticsService
+	    telemetryShutdown telemetry.TelemetryShutdown
 )
 
 func init() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
+
+	 telemetryConfig := telemetry.GetTelemetryConfigFromEnv()
+    var err error
+    telemetryShutdown, err = telemetry.InitTelemetry(telemetryConfig)
+    if err != nil {
+        log.Fatalf("Failed to initialize telemetry: %v", err)
+    }
+
+    // Initialize ALL metrics at once
+    if err := telemetry.InitAllMetrics(); err != nil {
+        log.Fatalf("Failed to initialize metrics: %v", err)
+    }
+    log.Println("✅ All metrics initialized")
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
@@ -107,14 +124,20 @@ func init() {
 // }
 
 func main() {
-	defer func() {
-		if err := client.Prisma.Disconnect(); err != nil {
-			log.Printf("Failed to disconnect from database: %v", err)
-		}
-		// if err := redisClient.Close(); err != nil {
-		// 	log.Printf("Failed to disconnect from Redis: %v", err)
-		// }
-	}()
+	 defer func() {
+        // Shutdown telemetry
+        if telemetryShutdown != nil {
+            ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+            defer cancel()
+            if err := telemetryShutdown(ctx); err != nil {
+                log.Printf("Failed to shutdown telemetry: %v", err)
+            }
+        }
+        
+        if err := client.Prisma.Disconnect(); err != nil {
+            log.Printf("Failed to disconnect from database: %v", err)
+        }
+    }()
 
 	tempLogger := hclog.Default()
 
@@ -130,11 +153,26 @@ func main() {
 
 	r := mux.NewRouter()
 
+
+	 r.Use(otelmux.Middleware("citystat-api"))
+    
+    // Add custom telemetry middleware
+    r.Use(appMiddleware.TelemetryMiddleware)
+
+    // Setup metrics endpoint
+    telemetry.SetupMetricsEndpoint(r)
+
 	// Add rate limiting middleware BEFORE other middlewares
 	// r.Use(rateLimiter.SmartRateLimiter())
 
 	// Public invite routes (no auth required but still rate limited)
 	r.HandleFunc("/invite", inviteHandler.ProcessInvite).Methods("GET")
+
+	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte(`{"status": "healthy", "service": "citystat-api"}`))
+    }).Methods("GET")
 
 	//! Add rate limit monitoring endpoint for admins
 	// r.HandleFunc("/admin/rate-limit/stats", getRateLimitStats).Methods("GET")
@@ -233,24 +271,29 @@ func main() {
 	}
 
 	go func() {
-		tempLogger.Info("Starting server on port ")
-		tempLogger.Info(port)
+        tempLogger.Info("Starting server with telemetry on port", "port", port)
+        err := server.ListenAndServe()
+        if err != nil && err != http.ErrServerClosed {
+            tempLogger.Error("Error starting server", "error", err)
+            os.Exit(1)
+        }
+    }()
 
-		err := server.ListenAndServe()
-		if err != nil {
-			tempLogger.Error("Error starting server", "error", err)
-			os.Exit(1)
-		}
-	}()
+	sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, os.Interrupt)
+    signal.Notify(sigChan, os.Kill)
 
-	sigChan := make(chan os.Signal)
-	signal.Notify(sigChan, os.Interrupt)
-	signal.Notify(sigChan, os.Kill)
+    sig := <-sigChan
+    log.Println("Got signal:", sig)
 
-	sig := <-sigChan
-	log.Println("Got signal:", sig)
+    // Graceful shutdown with timeout
+    shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer shutdownCancel()
 
-	timeoutContext, _ := context.WithTimeout(context.Background(), 30*time.Second)
+    // Shutdown HTTP server
+    if err := server.Shutdown(shutdownCtx); err != nil {
+        log.Printf("Server shutdown error: %v", err)
+    }
 
-	server.Shutdown(timeoutContext)
+    log.Println("Server shutdown complete")
 }
