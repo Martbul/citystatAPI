@@ -22,11 +22,9 @@ import (
 	"github.com/go-redis/redis/v8"
 	"golang.org/x/time/rate"
 
-	// "github.com/go-redis/redis/v8"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
-	"github.com/joho/godotenv"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 )
 
@@ -46,10 +44,6 @@ var (
 )
 
 func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
-	}
-
 	telemetryConfig := telemetry.GetTelemetryConfigFromEnv()
 	var err error
 	telemetryShutdown, err = telemetry.InitTelemetry(telemetryConfig)

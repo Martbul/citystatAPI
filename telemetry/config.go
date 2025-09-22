@@ -11,7 +11,7 @@ import (
     "go.opentelemetry.io/otel"
     "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
     "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-    "go.opentelemetry.io/otel/propagation"
+    // "go.opentelemetry.io/otel/propagation"
     "go.opentelemetry.io/otel/sdk/metric"
     "go.opentelemetry.io/otel/sdk/resource"
     "go.opentelemetry.io/otel/sdk/trace"
@@ -29,7 +29,7 @@ type TelemetryConfig struct {
 
 type TelemetryShutdown func(context.Context) error
 
-// InitTelemetry initializes OpenTelemetry with Uptrace
+
 func InitTelemetry(cfg TelemetryConfig) (TelemetryShutdown, error) {
     var shutdownFuncs []func(context.Context) error
 
@@ -45,43 +45,43 @@ func InitTelemetry(cfg TelemetryConfig) (TelemetryShutdown, error) {
         return nil, fmt.Errorf("failed to create resource: %w", err)
     }
 
-    // Initialize Uptrace
     if cfg.UptraceDSN != "" {
+        // ✅ Use Uptrace — handles traces + metrics
         uptrace.ConfigureOpentelemetry(
             uptrace.WithDSN(cfg.UptraceDSN),
             uptrace.WithServiceName(cfg.ServiceName),
             uptrace.WithServiceVersion(cfg.ServiceVersion),
+            uptrace.WithDeploymentEnvironment(cfg.Environment),
+            uptrace.WithMetricsEnabled(cfg.EnableMetrics),
         )
-        log.Println("✅ Uptrace initialized")
+        log.Println("✅ Uptrace initialized (tracing + metrics)")
+
+        return func(ctx context.Context) error {
+            // Flush before shutdown
+            uptrace.Shutdown(ctx)
+            return nil
+        }, nil
     }
 
-    // Set up trace propagation
-    otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-        propagation.TraceContext{},
-        propagation.Baggage{},
-    ))
-
-    // Initialize tracing
+    // Fallback: manual exporters (only if not using Uptrace)
     if cfg.EnableTracing {
         traceShutdown, err := initTracing(res)
         if err != nil {
             return nil, fmt.Errorf("failed to initialize tracing: %w", err)
         }
         shutdownFuncs = append(shutdownFuncs, traceShutdown)
-        log.Println("✅ Tracing initialized")
+        log.Println("✅ Tracing initialized (manual)")
     }
 
-    // Initialize metrics
     if cfg.EnableMetrics {
         metricShutdown, err := initMetrics(res)
         if err != nil {
             return nil, fmt.Errorf("failed to initialize metrics: %w", err)
         }
         shutdownFuncs = append(shutdownFuncs, metricShutdown)
-        log.Println("✅ Metrics initialized")
+        log.Println("✅ Metrics initialized (manual)")
     }
 
-    // Return combined shutdown function
     return func(ctx context.Context) error {
         var err error
         for _, fn := range shutdownFuncs {
@@ -92,6 +92,70 @@ func InitTelemetry(cfg TelemetryConfig) (TelemetryShutdown, error) {
         return err
     }, nil
 }
+
+// InitTelemetry initializes OpenTelemetry with Uptrace
+// func InitTelemetry(cfg TelemetryConfig) (TelemetryShutdown, error) {
+//     var shutdownFuncs []func(context.Context) error
+
+//     // Create resource with service information
+//     res, err := resource.New(context.Background(),
+//         resource.WithAttributes(
+//             semconv.ServiceName(cfg.ServiceName),
+//             semconv.ServiceVersion(cfg.ServiceVersion),
+//             semconv.DeploymentEnvironment(cfg.Environment),
+//         ),
+//     )
+//     if err != nil {
+//         return nil, fmt.Errorf("failed to create resource: %w", err)
+//     }
+
+//     // Initialize Uptrace
+//     if cfg.UptraceDSN != "" {
+//         uptrace.ConfigureOpentelemetry(
+//             uptrace.WithDSN(cfg.UptraceDSN),
+//             uptrace.WithServiceName(cfg.ServiceName),
+//             uptrace.WithServiceVersion(cfg.ServiceVersion),
+//         )
+//         log.Println("✅ Uptrace initialized")
+//     }
+
+//     // Set up trace propagation
+//     otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+//         propagation.TraceContext{},
+//         propagation.Baggage{},
+//     ))
+
+//     // Initialize tracing
+//     if cfg.EnableTracing {
+//         traceShutdown, err := initTracing(res)
+//         if err != nil {
+//             return nil, fmt.Errorf("failed to initialize tracing: %w", err)
+//         }
+//         shutdownFuncs = append(shutdownFuncs, traceShutdown)
+//         log.Println("✅ Tracing initialized")
+//     }
+
+//     // Initialize metrics
+//     if cfg.EnableMetrics {
+//         metricShutdown, err := initMetrics(res)
+//         if err != nil {
+//             return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+//         }
+//         shutdownFuncs = append(shutdownFuncs, metricShutdown)
+//         log.Println("✅ Metrics initialized")
+//     }
+
+//     // Return combined shutdown function
+//     return func(ctx context.Context) error {
+//         var err error
+//         for _, fn := range shutdownFuncs {
+//             if shutdownErr := fn(ctx); shutdownErr != nil {
+//                 err = fmt.Errorf("shutdown error: %v; %w", shutdownErr, err)
+//             }
+//         }
+//         return err
+//     }, nil
+// }
 
 func initTracing(res *resource.Resource) (func(context.Context) error, error) {
     traceExporter, err := otlptracehttp.New(context.Background())
