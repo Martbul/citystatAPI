@@ -201,6 +201,11 @@ func main() {
 		w.Write([]byte(`{"status": "healthy", "service": "citystat-api"}`))
 	}).Methods("GET")
 
+	// Serve loader.io verification file
+	r.HandleFunc("/loaderio-3bf896a89223b779dda0f87d80d0b369.txt", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./loaderio-3bf896a89223b779dda0f87d80d0b369.txt")
+	}).Methods("GET")
+
 	// API subrouter
 	api := r.PathPrefix("/api").Subrouter()
 
