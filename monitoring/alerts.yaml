@@ -1,0 +1,100 @@
+# Uptrace Alert Configuration
+# This is a template - actual implementation depends on your Uptrace setup
+
+alerts:
+  # API Performance Alerts
+  - name: "High Error Rate"
+    description: "API error rate is above 5% for 5 minutes"
+    query: |
+      rate(http_requests_total{status_class="4xx" or status_class="5xx"}[5m]) / 
+      rate(http_requests_total[5m]) > 0.05
+    severity: "critical"
+    for: "5m"
+    labels:
+      team: "backend"
+      service: "citystat-api"
+    annotations:
+      summary: "High error rate detected"
+      description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+      runbook_url: "https://your-docs.com/runbook/high-error-rate"
+
+  - name: "Slow Response Time"
+    description: "95th percentile response time is above 2 seconds"
+    query: |
+      histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+    severity: "warning"
+    for: "10m"
+    labels:
+      team: "backend"
+      service: "citystat-api"
+    annotations:
+      summary: "Slow API responses detected"
+      description: "95th percentile response time is {{ $value }}s"
+
+  - name: "High Memory Usage"
+    description: "Memory usage is above 80% of available memory"
+    query: |
+      memory_usage_bytes / (1024*1024*1024) > 0.8
+    severity: "warning"
+    for: "15m"
+    labels:
+      team: "infrastructure"
+      service: "citystat-api"
+
+  # Database Alerts
+  - name: "Database Connection Issues"
+    description: "High number of database connection errors"
+    query: |
+      rate(database_operations_total{error="true"}[5m]) > 10
+    severity: "critical"
+    for: "2m"
+    labels:
+      team: "backend"
+      service: "citystat-api"
+      component: "database"
+
+  - name: "Slow Database Queries"
+    description: "Database queries taking longer than 1 second"
+    query: |
+      histogram_quantile(0.95, rate(database_operation_duration_seconds_bucket[5m])) > 1
+    severity: "warning"
+    for: "10m"
+
+  # Business Logic Alerts
+  - name: "User Registration Drop"
+    description: "User registrations dropped significantly"
+    query: |
+      rate(user_registrations_total[1h]) < 0.1 * rate(user_registrations_total[24h] offset 24h)
+    severity: "warning"
+    for: "30m"
+    labels:
+      team: "product"
+      service: "citystat-api"
+
+  - name: "Search Functionality Issues"
+    description: "Search queries failing at high rate"
+    query: |
+      rate(search_queries_total{status="error"}[5m]) / 
+      rate(search_queries_total[5m]) > 0.1
+    severity: "critical"
+    for: "5m"
+
+  # Infrastructure Alerts
+  - name: "High Goroutine Count"
+    description: "Too many goroutines running"
+    query: |
+      goroutine_count > 1000
+    severity: "warning"
+    for: "10m"
+    labels:
+      team: "infrastructure"
+
+  - name: "Service Unavailable"
+    description: "Service is not responding to health checks"
+    query: |
+      up{job="citystat-api"} == 0
+    severity: "critical"
+    for: "1m"
+    labels:
+      team: "sre"
+      priority: "P1"

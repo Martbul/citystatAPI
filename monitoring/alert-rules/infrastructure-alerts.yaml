@@ -1,0 +1,33 @@
+groups:
+  - name: infrastructure
+    rules:
+      - alert: HighMemoryUsage
+        expr: memory_usage_bytes > 1073741824  # 1GB
+        for: 15m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizeBytes }}"
+
+      - alert: TooManyGoroutines
+        expr: goroutine_count > 1000
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High goroutine count"
+          description: "{{ $value }} goroutines running"
+
+      - alert: ServiceDown
+        expr: up{job="citystat-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+          priority: P1
+        annotations:
+          summary: "Service is down"
+          description: "citystat-api service is not responding"

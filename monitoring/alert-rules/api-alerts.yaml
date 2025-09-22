@@ -1,0 +1,40 @@
+groups:
+  - name: api_performance
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{status_class="4xx"}[5m]) +
+            rate(http_requests_total{status_class="5xx"}[5m])
+          ) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High error rate on {{ $labels.instance }}"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket[10m])
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Slow response times detected"
+          description: "95th percentile latency is {{ $value }}s"
+
+      - alert: HighRequestRate
+        expr: |
+          rate(http_requests_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Very high request rate"
+          description: "Request rate is {{ $value }} req/sec"

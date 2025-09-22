@@ -1,0 +1,42 @@
+groups:
+  - name: business_metrics
+    rules:
+      - alert: UserRegistrationDrop
+        expr: |
+          (
+            rate(user_registrations_total[1h]) < 
+            0.5 * rate(user_registrations_total[1h] offset 24h)
+          ) and (
+            rate(user_registrations_total[1h] offset 24h) > 0
+          )
+        for: 30m
+        labels:
+          severity: warning
+          team: product
+        annotations:
+          summary: "User registrations dropped significantly"
+          description: "Registrations down {{ $value | humanizePercentage }} compared to yesterday"
+
+      - alert: SearchFunctionalityDown
+        expr: |
+          rate(search_queries_total{result_count="0"}[15m]) / 
+          rate(search_queries_total[15m]) > 0.8
+        for: 10m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Search functionality appears broken"
+          description: "{{ $value | humanizePercentage }} of searches return no results"
+
+      - alert: CityDataProcessingStuck
+        expr: |
+          increase(city_data_processed_total[30m]) == 0 
+          and 
+          increase(city_data_processed_total[30m] offset 30m) > 0
+        for: 30m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "City data processing appears stuck" 
